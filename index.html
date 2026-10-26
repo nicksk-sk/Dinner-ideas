@@ -1,0 +1,1361 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Supper Cycle</title>
+<meta name="description" content="Dinner rotation tuned to season, weather and cycle phase.">
+<meta name="theme-color" content="#F3F5F1" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#111613" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Supper">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-180.png">
+<style>
+/* Layout: one column, sticky date header, iOS-style tab bar pinned to the bottom. System fonts only, so nothing downloads. */
+:root{
+  --bg:#F3F5F1; --surface:#FFFFFF; --sunk:#E7ECE5; --ink:#17201A; --muted:#5A665E; --line:#D7DED6;
+  --accent:#2C6A4E; --accent-ink:#FFFFFF; --accent-soft:#DCEBE1;
+  --warn:#8E5B00; --warn-soft:#F6EBD3; --bad:#A3303D; --bad-soft:#F6DFE1;
+  --ph-menstrual:#B0344A; --ph-follicular:#2D73A0; --ph-ovulatory:#A86E0B; --ph-luteal:#6E4FA3;
+  --cozy:#8F5428; --fresh:#167F7C; --grill:#B84B17;
+  --scrim:rgba(14,20,16,.38);
+  --f-display:ui-rounded,"SF Pro Rounded",-apple-system,BlinkMacSystemFont,system-ui,"Segoe UI",Roboto,sans-serif;
+  --f-body:-apple-system,BlinkMacSystemFont,system-ui,"Segoe UI",Roboto,"Helvetica Neue",sans-serif;
+  --r:14px;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#111613; --surface:#1A201C; --sunk:#232A25; --ink:#E6ECE7; --muted:#9AA69E; --line:#2F3832;
+  --accent:#6CC497; --accent-ink:#0D1A12; --accent-soft:#1F3A2B;
+  --warn:#E2B356; --warn-soft:#3A2F17; --bad:#F08A95; --bad-soft:#3D1F24;
+  --ph-menstrual:#EF7B8F; --ph-follicular:#72B5E0; --ph-ovulatory:#E7B04D; --ph-luteal:#B59BEA;
+  --cozy:#D9A06E; --fresh:#5CCBC6; --grill:#F08B5A; --scrim:rgba(0,0,0,.55); color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#111613; --surface:#1A201C; --sunk:#232A25; --ink:#E6ECE7; --muted:#9AA69E; --line:#2F3832;
+  --accent:#6CC497; --accent-ink:#0D1A12; --accent-soft:#1F3A2B;
+  --warn:#E2B356; --warn-soft:#3A2F17; --bad:#F08A95; --bad-soft:#3D1F24;
+  --ph-menstrual:#EF7B8F; --ph-follicular:#72B5E0; --ph-ovulatory:#E7B04D; --ph-luteal:#B59BEA;
+  --cozy:#D9A06E; --fresh:#5CCBC6; --grill:#F08B5A; --scrim:rgba(0,0,0,.55); color-scheme:dark}
+
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;background:var(--bg)}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 var(--f-body);
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  padding-bottom:calc(84px + env(safe-area-inset-bottom,0px));-webkit-tap-highlight-color:transparent}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);background:var(--bg);z-index:10}
+[hidden]{display:none!important}
+button,input,textarea,select{font:inherit;color:inherit}
+input,textarea,select{font-size:16px}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.num{font-variant-numeric:tabular-nums}
+main{max-width:640px;margin:0 auto;display:flex;flex-direction:column;gap:18px;padding-top:4px}
+
+.top{position:relative;background:var(--bg);max-width:640px;margin:0 auto;padding-block:12px 10px}
+.top h1{margin:0;font:700 28px/1.1 var(--f-display);letter-spacing:-.01em;text-wrap:balance}
+.top .sub{margin-top:2px;color:var(--muted);font-size:14px}
+.ctx{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.ctxchip{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:6px 12px;font-size:14px;line-height:1.2}
+.ctxchip .dot{width:9px;height:9px;border-radius:50%;background:var(--muted);flex:none}
+.ctxchip .set{color:var(--muted);font-size:12px}
+
+h2{margin:0;font:650 13px/1.2 var(--f-body);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+h3{margin:0;font:650 20px/1.2 var(--f-display);text-wrap:balance}
+.section{display:flex;flex-direction:column;gap:10px}
+.row{display:flex;align-items:center;gap:10px}
+.row.wrap{flex-wrap:wrap}
+.spacer{flex:1}
+.muted{color:var(--muted)}
+.small{font-size:14px}
+.hint{margin:0;color:var(--muted);font-size:14px}
+
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.card.hero{padding:18px;gap:12px;border-color:color-mix(in srgb,var(--accent) 35%,var(--line))}
+.card.hero h3{font-size:24px}
+.eyebrow{font-size:12px;font-weight:650;letter-spacing:.06em;text-transform:uppercase;color:var(--accent)}
+.list{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.item{display:flex;align-items:center;gap:12px;padding:12px 14px;border-top:1px solid var(--line);min-width:0;width:100%;text-align:left;background:none;border-left:0;border-right:0;border-bottom:0}
+.item:first-child{border-top:0}
+.item .grow{flex:1;min-width:0}
+.item .title{font-weight:600;overflow-wrap:anywhere}
+.item .meta{color:var(--muted);font-size:14px;margin-top:2px}
+
+.reasons{display:flex;flex-wrap:wrap;gap:6px}
+.rs{font-size:13px;line-height:1.2;padding:4px 9px;border-radius:999px;background:var(--sunk);color:var(--ink)}
+.rs.good{background:var(--accent-soft);color:var(--ink)}
+.rs.bad{background:var(--warn-soft);color:var(--warn)}
+.rs.ph{background:color-mix(in srgb,var(--phc) 16%,var(--surface));color:var(--ink)}
+.rs.ph::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--phc);margin-right:6px;vertical-align:1px}
+
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:10px 14px;font-weight:600;font-size:15px;min-height:44px;display:inline-flex;align-items:center;justify-content:center;gap:6px}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.ghost{background:transparent;border-color:transparent;color:var(--accent);padding-inline:8px}
+.btn.danger{color:var(--bad)}
+.btn.armed{background:var(--bad);border-color:var(--bad);color:#fff}
+.btn.sm{min-height:36px;padding:6px 12px;font-size:14px;border-radius:10px}
+.btn.wide{width:100%}
+.btn:disabled{opacity:.45}
+.btns{display:flex;gap:10px;flex-wrap:wrap}
+.btns>.btn{flex:1 1 140px}
+
+.banner{border-radius:var(--r);padding:12px 14px;display:flex;flex-direction:column;gap:10px;background:var(--warn-soft);color:var(--ink)}
+.banner.info{background:var(--accent-soft)}
+
+.seg{display:flex;background:var(--sunk);border-radius:11px;padding:3px;gap:3px}
+.seg button{flex:1;border:0;background:transparent;border-radius:9px;padding:8px 10px;font-weight:600;font-size:14px;color:var(--muted);min-height:36px}
+.seg button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.12)}
+
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:7px 12px;font-size:14px;min-height:36px;display:inline-flex;align-items:center;gap:6px}
+.chip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.chip.auto[aria-pressed="true"]{background:var(--accent-soft);border-color:color-mix(in srgb,var(--accent) 45%,var(--line));color:var(--ink)}
+.chip.off{text-decoration:line-through;color:var(--muted)}
+.chip .w{font-size:12px;font-weight:700}
+
+.field{display:flex;flex-direction:column;gap:8px}
+.field>span,.label{font-weight:650;font-size:15px}
+.input,input[type=text],input[type=number],input[type=date],input[type=search],textarea{width:100%;border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:10px 12px;min-height:44px}
+textarea{resize:vertical;line-height:1.45}
+input[type=number]{width:96px}
+input[type=date]{min-width:0}
+
+.ing{display:flex;flex-direction:column;gap:6px;margin-top:4px}
+.ingrow{display:flex;align-items:baseline;gap:8px;font-size:14px;flex-wrap:wrap}
+.ingrow .amt{color:var(--muted);min-width:64px}
+.ingrow .nm{font-weight:600}
+.tag{font-size:12px;padding:2px 7px;border-radius:6px;background:var(--sunk);color:var(--muted)}
+.tag.n{background:var(--accent-soft);color:var(--ink)}
+.tag.ask{background:var(--warn-soft);color:var(--warn);border:0;font-weight:650}
+.pill{font-size:12px;font-weight:650;padding:3px 8px;border-radius:999px;background:var(--sunk);color:var(--muted);white-space:nowrap}
+.pill.due{background:var(--accent-soft);color:var(--accent)}
+.pill.over{background:var(--accent);color:var(--accent-ink)}
+.pill.ex{background:var(--warn-soft);color:var(--warn)}
+
+.timeline{display:flex;height:14px;border-radius:7px;overflow:hidden;position:relative;background:var(--sunk)}
+.timeline>i{display:block;height:100%}
+.tl-wrap{position:relative;padding-top:4px}
+.tl-mark{position:absolute;top:-2px;width:3px;height:26px;border-radius:2px;background:var(--ink);transform:translateX(-50%)}
+.legend{display:flex;flex-wrap:wrap;gap:12px;font-size:13px;color:var(--muted)}
+.legend>span::before{content:"";display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--phc);margin-right:6px}
+.bigphase{font:700 34px/1.05 var(--f-display);color:var(--phc)}
+
+.plan-day{display:grid;grid-template-columns:52px 1fr;gap:12px;align-items:start}
+.plan-date{text-align:center;border-radius:12px;background:var(--sunk);padding:6px 0}
+.plan-date b{display:block;font:700 20px/1.1 var(--f-display)}
+.plan-date small{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.plan-date.today{background:var(--accent);color:var(--accent-ink)}
+.plan-date.today small{color:inherit}
+
+.groc{display:flex;align-items:flex-start;gap:12px;padding:10px 14px;border-top:1px solid var(--line)}
+.groc:first-child{border-top:0}
+.groc input{width:22px;height:22px;margin:1px 0 0;accent-color:var(--accent);flex:none}
+.groc .grow{flex:1;min-width:0}
+.groc.done .gname{text-decoration:line-through;color:var(--muted)}
+.gname{font-weight:600}
+.gq{color:var(--muted);font-size:14px}
+
+details>summary{cursor:pointer;color:var(--accent);font-weight:600;list-style:none;padding:6px 0}
+details>summary::-webkit-details-marker{display:none}
+
+.tabs{position:fixed;left:0;right:0;bottom:0;z-index:20;background:color-mix(in srgb,var(--surface) 92%,transparent);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-top:1px solid var(--line);
+  display:flex;justify-content:space-around;padding:6px max(8px,env(safe-area-inset-right,0px)) calc(6px + env(safe-area-inset-bottom,0px)) max(8px,env(safe-area-inset-left,0px))}
+.tabs a{flex:1;max-width:110px;display:flex;flex-direction:column;align-items:center;gap:2px;padding:4px 0;color:var(--muted);text-decoration:none;font-size:11px;font-weight:600}
+.tabs a svg{width:25px;height:25px}
+.tabs a[aria-current="page"]{color:var(--accent)}
+
+.sheet{position:fixed;inset:0;z-index:40;background:var(--scrim);display:flex;align-items:flex-end;justify-content:center}
+.panel{background:var(--bg);width:100%;max-width:640px;max-height:calc(100% - env(safe-area-inset-top,0px) - 16px);border-radius:20px 20px 0 0;display:flex;flex-direction:column;overflow:hidden}
+.panel-head{display:flex;align-items:center;gap:8px;padding:10px max(12px,env(safe-area-inset-right,0px)) 10px max(12px,env(safe-area-inset-left,0px));border-bottom:1px solid var(--line);background:var(--surface)}
+.panel-head h3{flex:1;text-align:center;font-size:17px}
+.panel-head .btn{min-width:72px}
+.panel-body{overflow:auto;-webkit-overflow-scrolling:touch;padding:16px max(16px,env(safe-area-inset-right,0px)) calc(24px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));display:flex;flex-direction:column;gap:18px}
+.opt{display:flex;flex-direction:column;align-items:flex-start;gap:2px}
+.opt small{color:var(--muted);font-size:13px}
+
+#toast{position:fixed;left:50%;bottom:calc(92px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:60;background:var(--ink);color:var(--bg);border-radius:12px;padding:10px 14px;display:flex;gap:12px;align-items:center;font-size:15px;max-width:calc(100% - 32px);box-shadow:0 6px 20px rgba(0,0,0,.2)}
+#toast button{background:none;border:0;color:var(--bg);font-weight:700;text-decoration:underline;padding:4px}
+.empty{text-align:center;padding:28px 12px;color:var(--muted);display:flex;flex-direction:column;gap:12px;align-items:center}
+.empty b{color:var(--ink);font:650 18px/1.2 var(--f-display)}
+pre.copy{white-space:pre-wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px;font-size:14px;user-select:all;-webkit-user-select:all;overflow-x:auto}
+@media (prefers-reduced-motion: no-preference){
+  .panel{animation:up .22s ease-out}
+  @keyframes up{from{transform:translateY(24px);opacity:.6}to{transform:none;opacity:1}}
+}
+</style>
+</head>
+<body>
+<header class="top" id="top"></header>
+<main id="view"></main>
+<nav class="tabs" id="tabs" aria-label="Sections">
+  <a href="#tonight" data-tab="tonight"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h18a9 8 0 0 1-18 0Z"/><path d="M8.5 8c0-1.6 1.2-2 1.2-3.6M12.5 8c0-1.6 1.2-2 1.2-3.6"/></svg>Tonight</a>
+  <a href="#plan" data-tab="plan"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>Plan</a>
+  <a href="#meals" data-tab="meals"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M5 6.5h14M5 12h14M5 17.5h9"/></svg>Meals</a>
+  <a href="#cycle" data-tab="cycle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 1 0 16Z" fill="currentColor" stroke="none"/></svg>Cycle</a>
+  <a href="#settings" data-tab="settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>Settings</a>
+</nav>
+<div class="sheet" id="sheet" hidden><div class="panel" role="dialog" aria-modal="true" aria-labelledby="sheetTitle"><div class="panel-head" id="sheetHead"></div><div class="panel-body" id="sheetBody"></div></div></div>
+<div id="toast" hidden role="status"></div>
+<input type="file" id="importFile" accept="application/json,.json" hidden>
+
+<script>
+'use strict';
+/* ============ constants ============ */
+const KEY = 'supperCycle.v1';
+const NUT = {iron:'Iron', vitc:'Vitamin C', omega3:'Omega-3', mag:'Magnesium', b6:'Vitamin B6', zinc:'Zinc', calcium:'Calcium', fiber:'Fiber', carbs:'Complex carbs', protein:'Protein'};
+const PH = {menstrual:'Menstrual', follicular:'Follicular', ovulatory:'Ovulatory', luteal:'Luteal'};
+const PH_KEYS = Object.keys(PH);
+const VIBE = {cozy:{label:'Cozy', hint:'cold or rainy'}, fresh:{label:'Fresh', hint:'hot out'}, grill:{label:'Grill', hint:'warm and dry'}};
+const VIBE_CLASH = {cozy:['fresh'], fresh:['cozy'], grill:['cozy']};
+const CITIES = {
+  nyc:{name:'New York', lat:40.7128, lon:-74.0060, tz:'America/New_York'},
+  sea:{name:'Seattle', lat:47.6062, lon:-122.3321, tz:'America/Los_Angeles'}
+};
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const DOW = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const DEFAULT_PHASE_MAP = {
+  menstrual:{iron:2, vitc:1, omega3:1},
+  follicular:{protein:1, fiber:1},
+  ovulatory:{fiber:1, zinc:1},
+  luteal:{mag:2, b6:1, carbs:1}
+};
+
+/* Ingredient nutrient list. Flags mean "a good source in a normal dinner portion".
+   Aliases are matched as whole words; the longest match wins (so "peanut butter" beats "butter"). */
+const DICT = [
+ ['beef|ground beef|steak|flank steak|skirt steak|sirloin|chuck|chuck roast|brisket|short rib|beef short rib|stew meat|ribeye|meatball','iron zinc protein b6'],
+ ['lamb|ground lamb|lamb chop|leg of lamb','iron zinc protein'],
+ ['liver|chicken liver|beef liver','iron zinc protein b6'],
+ ['chicken|chicken thigh|chicken breast|chicken drumstick|chicken leg|whole chicken|rotisserie chicken|chicken wing','protein b6'],
+ ['turkey|ground turkey|turkey breast','protein b6 zinc'],
+ ['pork|pork chop|pork loin|pork tenderloin|pork shoulder|ground pork|sausage|italian sausage|bacon|ham|chorizo','protein b6'],
+ ['salmon|salmon fillet|smoked salmon','omega3 protein b6'],
+ ['sardine','omega3 protein calcium iron'],
+ ['mackerel|trout|herring|arctic char','omega3 protein'],
+ ['tuna|canned tuna|tuna steak','protein b6'],
+ ['anchovy','omega3'],
+ ['shrimp|prawn|scallop','protein'],
+ ['mussel','iron protein omega3'],
+ ['clam','iron protein'],
+ ['oyster','zinc iron protein'],
+ ['fish|white fish|cod|halibut|tilapia|haddock|sea bass|snapper|mahi mahi','protein'],
+ ['tofu|firm tofu|extra firm tofu|silken tofu','protein iron calcium mag'],
+ ['tempeh','protein iron mag fiber'],
+ ['edamame','protein fiber iron mag'],
+ ['egg','protein'],
+ ['yogurt|greek yogurt','protein calcium'],
+ ['cheese|cheddar|mozzarella|parmesan|parmigiano|pecorino|feta|ricotta|goat cheese|gruyere|monterey jack|queso fresco|cotija|halloumi|paneer|swiss cheese|provolone|cottage cheese','calcium protein'],
+ ['milk|whole milk','calcium'],
+ ['lentil|red lentil|green lentil|brown lentil|black lentil|french lentil','iron fiber protein carbs mag zinc'],
+ ['chickpea|garbanzo|garbanzo bean|hummus','iron fiber protein carbs b6 mag zinc'],
+ ['black bean','iron fiber protein carbs mag'],
+ ['kidney bean|red kidney bean','iron fiber protein carbs'],
+ ['white bean|cannellini|cannellini bean|navy bean|great northern bean|butter bean|lima bean','iron fiber protein carbs mag'],
+ ['pinto bean|refried bean','iron fiber protein carbs mag'],
+ ['bean','iron fiber protein carbs'],
+ ['split pea','iron fiber protein carbs'],
+ ['pea|green pea|frozen pea','fiber vitc protein'],
+ ['snow pea|snap pea|sugar snap pea','vitc fiber'],
+ ['quinoa','mag iron fiber carbs protein'],
+ ['brown rice|wild rice','mag carbs fiber'],
+ ['oat|rolled oat|oatmeal|steel cut oat','fiber mag carbs iron'],
+ ['farro|barley|bulgur|freekeh|spelt','fiber carbs mag'],
+ ['whole wheat pasta|whole wheat spaghetti|whole wheat bread|whole grain bread|whole wheat tortilla|whole wheat pita','fiber carbs mag'],
+ ['buckwheat|soba|soba noodle','mag carbs'],
+ ['sweet potato|yam','carbs fiber b6 vitc'],
+ ['potato|russet potato|yukon gold|yukon gold potato|red potato|baby potato','carbs b6 vitc'],
+ ['butternut squash|acorn squash|squash|kabocha|delicata squash','vitc fiber carbs mag'],
+ ['pumpkin|pumpkin puree','fiber'],
+ ['corn|corn on the cob|ear of corn','fiber carbs'],
+ ['spinach|baby spinach','iron mag fiber'],
+ ['swiss chard|chard|rainbow chard','iron mag fiber'],
+ ['kale|lacinato kale|tuscan kale','vitc calcium'],
+ ['collard|collard green','calcium fiber iron'],
+ ['broccoli|broccolini|broccoli floret','vitc fiber'],
+ ['brussels sprout|brussel sprout','vitc fiber'],
+ ['bell pepper|red bell pepper|green bell pepper|yellow bell pepper|orange bell pepper|red pepper|green pepper|yellow pepper|poblano|jalapeno|sweet pepper|mini pepper','vitc'],
+ ['tomato|cherry tomato|grape tomato|roma tomato|canned tomato|crushed tomato|diced tomato|whole tomato|plum tomato|heirloom tomato|san marzano tomato|ripe tomato','vitc'],
+ ['cabbage|red cabbage|green cabbage|napa cabbage|savoy cabbage|coleslaw mix','vitc'],
+ ['cauliflower','vitc'],
+ ['bok choy|baby bok choy','vitc calcium'],
+ ['green bean|haricot vert','fiber vitc'],
+ ['asparagus','fiber'],
+ ['carrot|baby carrot','fiber'],
+ ['beet|beetroot','fiber'],
+ ['artichoke|artichoke heart','fiber mag'],
+ ['eggplant','fiber'],
+ ['avocado|guacamole','fiber mag b6'],
+ ['lemon|lemon juice|lemon zest','vitc'],
+ ['lime|lime juice','vitc'],
+ ['orange|orange juice|clementine|mandarin','vitc'],
+ ['strawberry','vitc'], ['kiwi','vitc'], ['mango','vitc'], ['pineapple','vitc'], ['papaya','vitc'], ['grapefruit','vitc'],
+ ['raspberry|blackberry','fiber vitc'],
+ ['blueberry|berry|mixed berry','fiber'],
+ ['banana','b6 carbs'],
+ ['pumpkin seed|pepita','mag zinc iron'],
+ ['almond|almond butter','mag fiber'],
+ ['cashew','mag zinc iron'],
+ ['sesame seed|tahini|sesame','iron mag'],
+ ['chia|chia seed','omega3 fiber mag calcium'],
+ ['flax|flaxseed|ground flaxseed|flax seed','omega3 fiber'],
+ ['walnut','omega3'],
+ ['peanut|peanut butter','protein mag'],
+ ['sunflower seed','mag b6'],
+ ['dark chocolate|cocoa|cocoa powder|cacao','mag iron'],
+ ['blackstrap molasses|molasses','iron mag calcium'],
+ ['cucumber|celery|zucchini|mushroom|lettuce|romaine|arugula|mixed green|salad green|leek|scallion|green onion|cilantro|parsley|basil|mint|dill|chive|radish|fennel|bean sprout',''],
+ ['heavy cream|cream|sour cream|creme fraiche|cream cheese|coconut milk|bread|baguette|pita|naan|tortilla|corn tortilla|flour tortilla|bun|hamburger bun|pasta|spaghetti|penne|pappardelle|rigatoni|linguine|noodle|rice noodle|egg noodle|ramen|udon|white rice|jasmine rice|basmati rice|rice|couscous|wine|red wine|white wine|beer|orzo|gnocchi|puff pastry|pizza dough',''],
+ ['salt|kosher salt|sea salt|pepper|black pepper|olive oil|oil|vegetable oil|canola oil|avocado oil|sesame oil|peanut oil|coconut oil|butter|ghee|flour|all purpose flour|sugar|brown sugar|honey|maple syrup|garlic|garlic clove|onion|yellow onion|red onion|white onion|sweet onion|shallot|ginger|soy sauce|tamari|fish sauce|oyster sauce|hoisin|sriracha|hot sauce|vinegar|red wine vinegar|white wine vinegar|sherry vinegar|rice vinegar|apple cider vinegar|balsamic vinegar|mustard|dijon|dijon mustard|mayo|mayonnaise|ketchup|cornstarch|baking powder|baking soda|broth|stock|chicken broth|chicken stock|beef broth|beef stock|vegetable broth|vegetable stock|bone broth|bouillon|tomato paste|red pepper flake|chili flake|chili powder|cumin|paprika|smoked paprika|oregano|thyme|rosemary|bay leaf|cinnamon|nutmeg|turmeric|coriander|curry powder|garam masala|cayenne|italian seasoning|za atar|sumac|vanilla|breadcrumb|panko|worcestershire|worcestershire sauce|miso|caper|olive|harissa|pesto|salsa|curry paste|red curry paste|green curry paste','','p']
+];
+const UNITS = {lb:'lb',lbs:'lb',pound:'lb',pounds:'lb',oz:'oz',ounce:'oz',ounces:'oz',g:'g',gram:'g',grams:'g',kg:'kg',ml:'ml',l:'l',liter:'l',liters:'l',
+  cup:'cup',cups:'cup',c:'cup',tbsp:'tbsp',tbs:'tbsp',tablespoon:'tbsp',tablespoons:'tbsp',tsp:'tsp',teaspoon:'tsp',teaspoons:'tsp',
+  clove:'clove',cloves:'clove',can:'can',cans:'can',bunch:'bunch',bunches:'bunch',head:'head',heads:'head',bag:'bag',bags:'bag',
+  package:'pkg',packages:'pkg',pkg:'pkg',pint:'pint',pints:'pint',quart:'quart',quarts:'quart',slice:'slice',slices:'slice',sprig:'sprig',sprigs:'sprig',
+  stalk:'stalk',stalks:'stalk',piece:'piece',pieces:'piece',fillet:'fillet',fillets:'fillet',jar:'jar',jars:'jar',box:'box',boxes:'box',
+  block:'block',blocks:'block',handful:'handful',pinch:'pinch',dozen:'dozen',loaf:'loaf',ear:'ear',ears:'ear'};
+const PLURAL_UNITS = {can:'cans',clove:'cloves',bunch:'bunches',head:'heads',bag:'bags',pkg:'pkgs',pint:'pints',quart:'quarts',slice:'slices',sprig:'sprigs',stalk:'stalks',piece:'pieces',fillet:'fillets',jar:'jars',box:'boxes',block:'blocks',cup:'cups',loaf:'loaves',ear:'ears',handful:'handfuls'};
+const FRAC = {'½':.5,'⅓':1/3,'⅔':2/3,'¼':.25,'¾':.75,'⅛':.125};
+const PREP_WORDS = /\b(fresh|freshly|chopped|diced finely|finely|roughly|thinly|minced|sliced|grated|shredded|peeled|large|small|medium|boneless|skinless|to taste|for serving|optional|cubed|halved|quartered|trimmed|rinsed|drained)\b/g;
+
+/* ============ helpers ============ */
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const uid = () => Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4);
+const pad = n => String(n).padStart(2, '0');
+function ymdLocal(d){ return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
+function today(){ return ymdLocal(new Date()); }
+function dUTC(s){ const [y,m,d] = s.split('-').map(Number); return Date.UTC(y, m - 1, d); }
+function diff(a, b){ return Math.round((dUTC(a) - dUTC(b)) / 864e5); }
+function add(s, n){ const t = new Date(dUTC(s) + n * 864e5); return t.getUTCFullYear() + '-' + pad(t.getUTCMonth() + 1) + '-' + pad(t.getUTCDate()); }
+function dow(s){ return new Date(dUTC(s)).getUTCDay(); }
+function monthOf(s){ return Number(s.slice(5, 7)); }
+function fmtDate(s, opts){ const d = new Date(dUTC(s)); return d.toLocaleDateString(undefined, Object.assign({timeZone:'UTC'}, opts || {weekday:'short', month:'short', day:'numeric'})); }
+function ago(s){ const n = diff(today(), s); if (n === 0) return 'today'; if (n === 1) return 'yesterday'; if (n < 0) return 'in ' + (-n) + ' days'; return n + ' days ago'; }
+function hash(str){ let h = 2166136261; for (let i = 0; i < str.length; i++){ h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0); }
+function cap(s){ return s.charAt(0).toUpperCase() + s.slice(1); }
+
+/* ============ ingredient text ============ */
+function singular(w){
+  if (w.length <= 3) return w;
+  if (/ies$/.test(w)) return w.slice(0, -3) + 'y';
+  if (/(oes|ches|shes|xes)$/.test(w)) return w.slice(0, -2);
+  if (/(ss|us)$/.test(w)) return w;
+  if (/s$/.test(w)) return w.slice(0, -1);
+  return w;
+}
+function norm(s){
+  return String(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9 ]+/g, ' ')
+    .split(/\s+/).filter(Boolean).map(singular).join(' ');
+}
+function cleanName(name){
+  return String(name).replace(/\([^)]*\)/g, ' ').split(',')[0].toLowerCase().replace(PREP_WORDS, ' ').replace(/\s+/g, ' ').trim();
+}
+const ALIASES = (() => {
+  const list = [];
+  DICT.forEach(([aliases, flags, kind]) => {
+    const all = aliases.split('|');
+    const key = norm(all[0]);
+    const f = flags ? flags.split(' ') : [];
+    all.forEach(a => list.push({a: norm(a), key, flags: f, pantry: kind === 'p'}));
+  });
+  return list.sort((x, y) => y.a.length - x.a.length);
+})();
+function ingInfo(name){
+  const n = norm(cleanName(name));
+  if (!n) return null;
+  const c = state.customIng[n];
+  if (c) return {key: n, flags: c.flags || [], pantry: !!c.pantry, custom: true, known: true};
+  const padded = ' ' + n + ' ';
+  for (const al of ALIASES){ if (padded.includes(' ' + al.a + ' ')) return {key: al.key, flags: al.flags, pantry: al.pantry, known: true}; }
+  return {key: n, flags: [], pantry: false, known: false};
+}
+function parseLine(line){
+  let s = line.replace(/^[\s\-•*·]+/, '').trim();
+  if (!s) return null;
+  const m = s.match(/^((?:\d+\s+\d+\/\d+)|(?:\d+\/\d+)|(?:\d*\.?\d+\s*[½⅓⅔¼¾⅛])|(?:[½⅓⅔¼¾⅛])|(?:\d*\.?\d+(?:\s*(?:-|–|to)\s*\d*\.?\d+)?))(?=\s|$|[a-zA-Z(])\s*/);
+  let amt = '', rest = s;
+  if (m){
+    amt = m[1]; rest = s.slice(m[0].length);
+    const par = rest.match(/^\([^)]*\)\s*/);
+    if (par){ amt += ' ' + par[0].trim(); rest = rest.slice(par[0].length); }
+    const u = rest.match(/^([a-zA-Z]+)\.?(?=\s|$)\s*/);
+    if (u && UNITS[u[1].toLowerCase()] && rest.slice(u[0].length).trim()){ amt += ' ' + u[1]; rest = rest.slice(u[0].length).replace(/^of\s+/i, ''); }
+  }
+  rest = rest.trim();
+  if (!rest){ return {amt: '', name: s}; }
+  return {amt: amt.trim(), name: rest};
+}
+function parseIngs(text){ return String(text || '').split('\n').map(parseLine).filter(Boolean); }
+function ingsToText(ings){ return (ings || []).map(i => (i.amt ? i.amt + ' ' : '') + i.name).join('\n'); }
+function amountParse(a){
+  if (!a) return {n: null, u: ''};
+  const s = a.replace(/\([^)]*\)/g, ' ').trim();
+  let n = null, m;
+  if ((m = s.match(/^(\d+)\s+(\d+)\/(\d+)/))) n = +m[1] + m[2] / m[3];
+  else if ((m = s.match(/^(\d+)\/(\d+)/))) n = m[1] / m[2];
+  else if ((m = s.match(/^(\d*\.?\d+)\s*([½⅓⅔¼¾⅛])/))) n = +m[1] + FRAC[m[2]];
+  else if ((m = s.match(/^([½⅓⅔¼¾⅛])/))) n = FRAC[m[1]];
+  else if ((m = s.match(/^(\d*\.?\d+)\s*(?:-|–|to)\s*\d*\.?\d+/))) n = null;
+  else if ((m = s.match(/^(\d*\.?\d+)/))) n = +m[1];
+  const rest = m ? s.slice(m[0].length) : s;
+  const w = (rest.trim().split(/\s+/)[0] || '').toLowerCase().replace(/\.$/, '');
+  return {n, u: UNITS[w] || '', range: !!(m && n === null)};
+}
+function fmtNum(n){
+  const whole = Math.floor(n + 1e-9), f = n - whole;
+  const fr = [[.125,'⅛'],[.25,'¼'],[1/3,'⅓'],[.5,'½'],[2/3,'⅔'],[.75,'¾']].find(([v]) => Math.abs(v - f) < .03);
+  if (f < .03) return String(whole);
+  if (fr) return (whole ? whole : '') + fr[1];
+  return String(Math.round(n * 100) / 100);
+}
+function fmtQty(n, u){ if (!u) return fmtNum(n); return fmtNum(n) + ' ' + (n > 1 && PLURAL_UNITS[u] ? PLURAL_UNITS[u] : u); }
+
+/* ============ state ============ */
+let state;
+const ui = {mealsTab: 'list', q: '', pickQ: '', wxError: null, wxLoading: false};
+let draft = null;
+
+const SAMPLES = [
+ {name:'Red lentil soup', ings:'1½ cups red lentils\n2 carrots\n1 onion\n3 cloves garlic\n1 (14 oz) can diced tomatoes\n1 tsp cumin\n4 cups vegetable broth\n5 oz baby spinach\n1 lemon', sched:{type:'days', days:21}, when:'any', vibes:['cozy'], phases:['menstrual'], months:null, ago:25},
+ {name:'Gazpacho with grilled shrimp', ings:'2 lb ripe tomatoes\n1 cucumber\n1 red bell pepper\n1 clove garlic\n2 tbsp sherry vinegar\n¼ cup olive oil\n1 lb shrimp\n1 baguette', sched:{type:'days', days:30}, when:'any', vibes:['fresh'], phases:[], months:[6,7,8,9], ago:60},
+ {name:'Beef and broccoli', ings:'1 lb flank steak\n1 head broccoli\n3 cloves garlic\n1 tbsp ginger\n3 tbsp soy sauce\n1½ cups brown rice', sched:{type:'days', days:14}, when:'weeknight', vibes:[], phases:[], months:null, ago:9},
+ {name:'Sheet-pan salmon, sweet potato and kale', ings:'4 salmon fillets\n2 sweet potatoes\n1 bunch kale\n1 lemon\n2 tbsp olive oil', sched:{type:'days', days:14}, when:'weeknight', vibes:[], phases:[], months:null, ago:16},
+ {name:'White bean, sausage and kale stew', ings:'1 lb Italian sausage\n2 (15 oz) cans cannellini beans\n1 bunch lacinato kale\n1 onion\n4 cups chicken broth\n½ cup parmesan', sched:{type:'days', days:30}, when:'any', vibes:['cozy'], phases:[], months:[10,11,12,1,2,3], ago:40},
+ {name:'Chicken souvlaki with tzatziki', ings:'2 lb chicken thighs\n2 lemons\n1 cup Greek yogurt\n1 cucumber\n1 red onion\n2 tomatoes\n4 pitas', sched:{type:'days', days:30}, when:'any', vibes:['grill'], phases:[], months:[5,6,7,8,9], ago:70},
+ {name:'Black bean tacos', ings:'2 (15 oz) cans black beans\n12 corn tortillas\n2 avocados\n2 limes\n1 bunch cilantro\n¼ red cabbage\n4 oz queso fresco', sched:{type:'days', days:10}, when:'weeknight', vibes:[], phases:[], months:null, ago:4},
+ {name:'Short rib ragu', ings:'3 lb beef short ribs\n1 (28 oz) can crushed tomatoes\n2 carrots\n2 stalks celery\n1 onion\n1 cup red wine\n1 lb pappardelle', sched:{type:'days', days:60}, when:'weekend', vibes:['cozy'], phases:[], months:[10,11,12,1,2,3], ago:80, notes:'Slow Sunday project.'},
+ {name:'Chickpea and spinach curry', ings:'2 (15 oz) cans chickpeas\n5 oz baby spinach\n1 (13.5 oz) can coconut milk\n1 (14 oz) can diced tomatoes\n1 onion\n3 cloves garlic\n1 tbsp ginger\n2 tbsp curry powder\n1½ cups brown rice', sched:{type:'phase', phase:'luteal'}, when:'any', vibes:['cozy'], phases:['luteal'], months:null, ago:20},
+ {name:'Mussels in white wine', ings:'2 lb mussels\n1 cup white wine\n2 shallots\n4 cloves garlic\n1 bunch parsley\n2 tbsp butter\n1 baguette', sched:{type:'days', days:45}, when:'weekend', vibes:[], phases:[], months:null, ago:50},
+ {name:'Soba salad with tofu and edamame', ings:'8 oz soba noodles\n1 block firm tofu\n1½ cups edamame\n1 cucumber\n2 carrots\n2 tbsp sesame seeds\n3 tbsp soy sauce\n2 limes', sched:{type:'days', days:21}, when:'weeknight', vibes:['fresh'], phases:[], months:null, ago:30},
+ {name:'Turkey chili', ings:'1 lb ground turkey\n2 (15 oz) cans kidney beans\n1 (28 oz) can crushed tomatoes\n2 bell peppers\n1 onion\n2 tbsp chili powder\n4 oz cheddar', sched:{type:'days', days:30}, when:'any', vibes:['cozy'], phases:[], months:null, ago:35}
+];
+function newMeal(name){
+  return {id: uid(), name: name || '', ings: [], sched: {type:'days', days: (state && state.settings.defaultDays) || 21}, when:'any', vibes:[], phases:[], months:null, nOver:{}, notes:'', active:true, seedLast:null};
+}
+function defaultState(withSamples){
+  const s = {v:1, city:'nyc', settings:{coldMax:55, hotMin:82, weekendDays:[0,6], defaultDays:21, phaseMap: JSON.parse(JSON.stringify(DEFAULT_PHASE_MAP))},
+    meals:[], log:[], periods:[], plan:null, planCfg:{offset:0, n:4}, customIng:{}, overrides:{}, weather:null, lastBackup:null, seed:0};
+  if (withSamples){
+    const t = today();
+    SAMPLES.forEach(x => {
+      const m = Object.assign(newMeal(x.name), {ings: parseIngs(x.ings), sched: x.sched, when: x.when, vibes: x.vibes, phases: x.phases, months: x.months, notes: x.notes || '', example: true});
+      s.meals.push(m);
+      s.log.push({id: uid(), date: add(t, -x.ago), type:'meal', mealId: m.id, name: m.name, confirmed: true, example: true});
+    });
+    s.log.push({id: uid(), date: add(t, -2), type:'out', name:'Ate out', confirmed: true, example: true});
+  }
+  return s;
+}
+function migrate(s){
+  const d = defaultState(false);
+  const out = Object.assign(d, s);
+  out.settings = Object.assign({}, d.settings, s.settings || {});
+  out.settings.phaseMap = Object.assign({}, JSON.parse(JSON.stringify(DEFAULT_PHASE_MAP)), (s.settings || {}).phaseMap || {});
+  ['meals','log','periods'].forEach(k => { if (!Array.isArray(out[k])) out[k] = []; });
+  out.meals.forEach(m => { m.ings = m.ings || []; m.vibes = m.vibes || []; m.phases = m.phases || []; m.nOver = m.nOver || {}; m.sched = m.sched || {type:'days', days:21}; });
+  out.customIng = out.customIng || {};
+  out.overrides = out.overrides || {};
+  out.planCfg = out.planCfg || {offset:0, n:4};
+  return out;
+}
+function load(){
+  try { const raw = localStorage.getItem(KEY); if (raw){ state = migrate(JSON.parse(raw)); } } catch (e) { state = null; }
+  if (!state){ state = defaultState(true); save(); }
+  const cutoff = add(today(), -14);
+  Object.keys(state.overrides).forEach(k => { if (k < cutoff) delete state.overrides[k]; });
+}
+function save(){
+  try { localStorage.setItem(KEY, JSON.stringify(state)); }
+  catch (e) { toast('Could not save. Phone storage may be full.'); }
+}
+const mealById = id => state.meals.find(m => m.id === id);
+const hasExamples = () => state.meals.some(m => m.example) || state.log.some(e => e.example);
+
+/* ============ cycle ============ */
+function cycleStats(){
+  const ps = state.periods.slice().sort((a, b) => a.start < b.start ? -1 : 1);
+  const gaps = [];
+  for (let i = 1; i < ps.length; i++){ const g = diff(ps[i].start, ps[i - 1].start); if (g >= 18 && g <= 50) gaps.push(g); }
+  const rg = gaps.slice(-6);
+  const L = rg.length ? Math.round(rg.reduce((a, b) => a + b, 0) / rg.length) : 28;
+  const lens = ps.filter(p => p.end).map(p => diff(p.end, p.start) + 1).filter(n => n >= 1 && n <= 12).slice(-6);
+  const P = lens.length ? Math.round(lens.reduce((a, b) => a + b, 0) / lens.length) : 5;
+  return {ps, L, P, nCycles: rg.length, nLens: lens.length};
+}
+function phaseOnDay(day, L, menEnd){
+  if (day <= menEnd) return 'menstrual';
+  if (day > L) return 'luteal';
+  const ov = Math.max(L - 14, menEnd + 2);
+  if (day < ov - 1) return 'follicular';
+  if (day <= ov + 1) return 'ovulatory';
+  return 'luteal';
+}
+function estPhase(date){
+  const st = cycleStats(); const {ps, L, P} = st; const t = today();
+  if (!ps.length) return {phase: null};
+  let idx = -1;
+  for (let i = 0; i < ps.length; i++) if (ps[i].start <= date) idx = i;
+  if (idx < 0) return {phase: null};
+  const last = ps[idx];
+  let cycleStart = last.start;
+  let menEnd = last.end ? diff(last.end, last.start) + 1 : P;
+  let day = diff(date, cycleStart) + 1;
+  let projected = false;
+  if (date > t && idx === ps.length - 1){
+    let next = add(cycleStart, L);
+    if (next <= t) next = add(t, 1);
+    if (date >= next){ const k = Math.floor(diff(date, next) / L); cycleStart = add(next, k * L); day = diff(date, cycleStart) + 1; menEnd = P; projected = true; }
+  }
+  if (day > L + 45) return {phase: null, stale: true};
+  const phase = phaseOnDay(day, L, menEnd);
+  let phaseStart = cycleStart;
+  for (let d = 1; d <= day; d++){ if (phaseOnDay(d, L, menEnd) === phase){ phaseStart = add(cycleStart, d - 1); break; } }
+  return {phase, day, cycleStart, phaseStart, L, P, menEnd, projected, late: day > L};
+}
+function phaseFor(date){
+  const o = state.overrides[date];
+  if (o && o.phase){ const e = estPhase(date); return Object.assign({}, e, {phase: o.phase, manual: true, phaseStart: e.phase === o.phase ? e.phaseStart : null}); }
+  return estPhase(date);
+}
+
+/* ============ weather ============ */
+function weatherFor(date){ const w = state.weather; if (!w || w.city !== state.city) return null; return w.days[date] || null; }
+function autoVibes(wx){
+  const s = state.settings, v = new Set();
+  if (!wx || wx.hi == null) return v;
+  const hi = wx.hi, pp = wx.pp ?? 0, ps = wx.ps ?? 0;
+  const wet = pp >= 50 || ps >= 0.1;
+  if (hi <= s.coldMax || (wet && hi < 72)) v.add('cozy');
+  if (hi >= s.hotMin) v.add('fresh');
+  if (!wet && pp < 30 && hi >= 65 && !v.has('cozy')) v.add('grill');
+  return v;
+}
+function vibesFor(date){
+  const o = state.overrides[date];
+  if (o && o.vibe) return o.vibe === 'mild' ? new Set() : new Set([o.vibe]);
+  return autoVibes(weatherFor(date));
+}
+async function ensureWeather(force){
+  const c = CITIES[state.city]; const w = state.weather;
+  if (!force && w && w.city === state.city && w.fetched === today()) return;
+  if (ui.wxLoading) return;
+  ui.wxLoading = true; ui.wxError = null;
+  try {
+    const url = 'https://api.open-meteo.com/v1/forecast?latitude=' + c.lat + '&longitude=' + c.lon +
+      '&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum' +
+      '&temperature_unit=fahrenheit&precipitation_unit=inch&timezone=' + encodeURIComponent(c.tz) + '&forecast_days=8';
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const j = await res.json(); const d = j.daily;
+    const days = {};
+    d.time.forEach((t, i) => { days[t] = {hi: d.temperature_2m_max[i], lo: d.temperature_2m_min[i], pp: d.precipitation_probability_max ? d.precipitation_probability_max[i] : null, ps: d.precipitation_sum ? d.precipitation_sum[i] : null}; });
+    state.weather = {city: state.city, fetched: today(), days};
+    save();
+  } catch (e) {
+    ui.wxError = navigator.onLine === false ? 'Offline' : 'Weather unavailable';
+  }
+  ui.wxLoading = false;
+  render();
+}
+function wxText(wx){
+  if (!wx) return '';
+  const rain = (wx.pp ?? 0) >= 50 || (wx.ps ?? 0) >= 0.1 ? ', rain likely' : (wx.pp ?? 0) >= 30 ? ', chance of rain' : '';
+  return Math.round(wx.hi) + '°' + rain;
+}
+
+/* ============ scoring ============ */
+function mealNutrients(m, ingsOverride){
+  const ings = ingsOverride || m.ings || [];
+  const auto = {};
+  ings.forEach(i => { const info = ingInfo(i.name); if (!info) return; info.flags.forEach(f => { (auto[f] = auto[f] || []); const nm = cleanName(i.name); if (!auto[f].includes(nm)) auto[f].push(nm); }); });
+  const fin = {};
+  Object.keys(auto).forEach(k => fin[k] = auto[k]);
+  Object.entries(m.nOver || {}).forEach(([n, on]) => { if (on === true && !fin[n]) fin[n] = []; if (on === false) delete fin[n]; });
+  return {auto, fin};
+}
+function lastMade(m, before, planned){
+  let last = m.seedLast || null;
+  if (last && last > before) last = null;
+  for (const e of state.log) if (e.type === 'meal' && e.mealId === m.id && e.date <= before && (!last || e.date > last)) last = e.date;
+  for (const p of planned || []) if (p.mealId === m.id && p.date < before && (!last || p.date > last)) last = p.date;
+  return last;
+}
+function ctxFor(date, extra){
+  extra = extra || {};
+  return {date, phase: phaseFor(date), vibes: vibesFor(date), dayType: dayType(date), planned: extra.planned || [], share: extra.share || null, exclude: extra.exclude || new Set(), seed: state.seed || 0};
+}
+function dayType(date){
+  const o = state.overrides[date];
+  if (o && o.dayType) return o.dayType;
+  return state.settings.weekendDays.includes(dow(date)) ? 'weekend' : 'weekday';
+}
+function scoreMeal(m, ctx){
+  const R = {score: 0, reasons: [], blocked: null};
+  const why = (t, k, p, extra) => R.reasons.push(Object.assign({t, k, p}, extra || {}));
+  const ph = ctx.phase;
+  if (m.when === 'weekend' && ctx.dayType === 'weekday') R.blocked = 'Weekend meal';
+  const last = lastMade(m, ctx.date, ctx.planned);
+  const since = last ? diff(ctx.date, last) : null;
+  if (m.sched && m.sched.type === 'phase'){
+    const target = m.sched.phase;
+    if (ph.phase === target){
+      const start = ph.phaseStart || add(ctx.date, -10);
+      if (last && last >= start){ R.blocked = 'Already had it this ' + PH[target].toLowerCase() + ' phase'; }
+      else { R.score += 40; why('Your ' + PH[target].toLowerCase() + ' meal', 'ph', 1, {phase: target}); }
+    } else if (ph.phase){ R.score -= 25; why('Saved for ' + PH[target].toLowerCase(), 'bad', 6); }
+    else { R.score += since === null ? 20 : Math.min(since / 28, 1.5) * 20; }
+  } else {
+    const F = Math.max(1, (m.sched && m.sched.days) || state.settings.defaultDays);
+    if (since === null){ R.score += 35; why('Not made yet', 'good', 4); }
+    else {
+      const q = since / F;
+      if (since === 0) R.blocked = 'Made today';
+      else if (q < 0.5) R.blocked = 'Made ' + since + ' days ago';
+      R.score += q < 1 ? 30 * q : 30 + 10 * Math.min(q - 1, 1.5);
+      if (since - F >= 3) why('Overdue by ' + (since - F) + ' days', 'good', 3);
+      else if (since >= F) why('Due now', 'good', 3);
+      else why('Last made ' + since + ' days ago', 'n', 8);
+    }
+  }
+  const map = ph.phase ? state.settings.phaseMap[ph.phase] : null;
+  if (map){
+    const {fin} = mealNutrients(m);
+    let ns = 0;
+    Object.entries(map).sort((a, b) => b[1] - a[1]).forEach(([n, w]) => {
+      const src = fin[n];
+      if (src && w > 0){
+        ns += w * 8 * (src.length >= 2 ? 1.25 : 1);
+        why(NUT[n] + (src.length ? ': ' + src.slice(0, 2).join(', ') : ''), 'ph', 2, {phase: ph.phase});
+      }
+    });
+    R.score += Math.min(ns, 32);
+  }
+  if (ph.phase && (m.phases || []).includes(ph.phase)){ R.score += 12; why('Good for ' + PH[ph.phase].toLowerCase(), 'ph', 2, {phase: ph.phase}); }
+  const mv = m.vibes || [];
+  if (ctx.vibes.size && mv.length){
+    const hit = mv.find(v => ctx.vibes.has(v));
+    if (hit){ R.score += 15; why(VIBE[hit].label + ' weather', 'good', 2); }
+    else {
+      const clash = mv.find(v => (VIBE_CLASH[v] || []).some(c => ctx.vibes.has(c)));
+      if (clash){ R.score -= 15; why('Not a ' + VIBE[clash].label.toLowerCase() + ' day', 'bad', 5); }
+    }
+  }
+  if (m.months && m.months.length && m.months.length < 12){
+    if (m.months.includes(monthOf(ctx.date))){ R.score += 8; why('In season', 'good', 5); }
+    else { R.score -= 25; why('Out of season', 'bad', 5); }
+  }
+  if (ctx.share && ctx.share.size){
+    const shared = [];
+    (m.ings || []).forEach(i => { const info = ingInfo(i.name); if (info && !info.pantry && ctx.share.has(info.key) && !shared.includes(cleanName(i.name))) shared.push(cleanName(i.name)); });
+    if (shared.length){ R.score += Math.min(shared.length * 6, 18); why('Uses up ' + shared.slice(0, 2).join(', '), 'good', 4); }
+  }
+  R.score += (hash(ctx.date + ':' + ctx.seed + ':' + m.id) % 500) / 100;
+  R.reasons.sort((a, b) => a.p - b.p);
+  return R;
+}
+function rank(ctx){
+  const out = [];
+  for (const m of state.meals){
+    if (m.active === false || ctx.exclude.has(m.id)) continue;
+    out.push(Object.assign({m}, scoreMeal(m, ctx)));
+  }
+  const ok = out.filter(x => !x.blocked).sort((a, b) => b.score - a.score);
+  const blocked = out.filter(x => x.blocked).sort((a, b) => b.score - a.score);
+  return {ok, blocked};
+}
+
+/* ============ log ============ */
+function logEntry(date, entry){
+  const prev = JSON.stringify(state.log);
+  state.log = state.log.filter(e => e.date !== date);
+  state.log.push(Object.assign({id: uid(), date}, entry));
+  save();
+  return prev;
+}
+function logMeal(mealId, date, confirmed){
+  const m = mealById(mealId);
+  const prev = logEntry(date, {type:'meal', mealId, name: m ? m.name : '', confirmed: !!confirmed});
+  toast('Logged ' + (m ? m.name : 'dinner') + (date === today() ? '' : ' for ' + fmtDate(date)), () => { state.log = JSON.parse(prev); save(); render(); });
+}
+function logOut(date){
+  const prev = logEntry(date, {type:'out', name:'Ate out', confirmed: true});
+  toast('Logged eating out', () => { state.log = JSON.parse(prev); save(); render(); });
+}
+function pendingConfirm(){
+  const t = today();
+  const c = state.log.filter(e => e.type === 'meal' && !e.confirmed && e.date < t).sort((a, b) => a.date < b.date ? 1 : -1);
+  let changed = false;
+  c.forEach((e, i) => { if (diff(t, e.date) > 3){ e.confirmed = true; changed = true; } });
+  if (changed) save();
+  return c.find(e => !e.confirmed) || null;
+}
+
+/* ============ rendering bits ============ */
+function phaseVar(p){ return p ? 'var(--ph-' + p + ')' : 'var(--muted)'; }
+function reasonsHTML(list, max){
+  return '<div class="reasons">' + list.slice(0, max || 4).map(r => {
+    if (r.k === 'ph') return '<span class="rs ph" style="--phc:' + phaseVar(r.phase) + '">' + esc(r.t) + '</span>';
+    return '<span class="rs ' + (r.k === 'good' ? 'good' : r.k === 'bad' ? 'bad' : '') + '">' + esc(r.t) + '</span>';
+  }).join('') + '</div>';
+}
+function schedText(m){
+  if (m.sched && m.sched.type === 'phase') return 'Once per ' + PH[m.sched.phase].toLowerCase() + ' phase';
+  const d = (m.sched && m.sched.days) || state.settings.defaultDays;
+  if (d % 7 === 0 && d <= 28) return d === 7 ? 'Weekly' : 'Every ' + (d / 7) + ' weeks';
+  if (d === 30) return 'Monthly';
+  if (d === 60) return 'Every 2 months';
+  if (d === 90) return 'Every 3 months';
+  return 'Every ' + d + ' days';
+}
+function mealStatus(m){
+  const t = today();
+  const last = lastMade(m, t, []);
+  if (m.sched && m.sched.type === 'phase') return {pill: '<span class="pill" style="color:' + phaseVar(m.sched.phase) + '">' + PH[m.sched.phase] + '</span>', last};
+  if (!last) return {pill: '<span class="pill due">New</span>', last};
+  const F = (m.sched && m.sched.days) || state.settings.defaultDays, since = diff(t, last);
+  if (since - F >= 3) return {pill: '<span class="pill over">Overdue</span>', last};
+  if (since >= F) return {pill: '<span class="pill due">Due</span>', last};
+  return {pill: '<span class="pill">Resting</span>', last};
+}
+
+function headerHTML(title, sub, ctxChips){
+  return '<h1>' + esc(title) + '</h1>' + (sub ? '<div class="sub">' + sub + '</div>' : '') + (ctxChips || '');
+}
+function ctxChipsHTML(date){
+  const ph = phaseFor(date);
+  const wx = weatherFor(date);
+  const o = state.overrides[date] || {};
+  const vibes = [...vibesFor(date)];
+  let phTxt = ph.phase ? PH[ph.phase] + (ph.day && !ph.manual ? ' · day ' + ph.day : '') : 'Set phase';
+  let wxTxt;
+  if (o.vibe) wxTxt = (o.vibe === 'mild' ? 'Mild' : VIBE[o.vibe].label);
+  else if (wx) wxTxt = wxText(wx) + ' · ' + (vibes.length ? vibes.map(v => VIBE[v].label).join(' + ') : 'Mild');
+  else wxTxt = ui.wxLoading ? 'Checking weather' : (ui.wxError ? ui.wxError + ' · set vibe' : 'Set weather vibe');
+  const dt = dayType(date);
+  return '<div class="ctx">' +
+    '<button class="ctxchip" data-act="pickPhase" data-date="' + date + '"><span class="dot" style="background:' + phaseVar(ph.phase) + '"></span>' + esc(phTxt) + (ph.manual ? ' <span class="set">set</span>' : '') + '</button>' +
+    '<button class="ctxchip" data-act="pickVibe" data-date="' + date + '"><span class="dot" style="background:' + (vibes[0] ? 'var(--' + vibes[0] + ')' : 'var(--muted)') + '"></span>' + esc(wxTxt) + (o.vibe ? ' <span class="set">set</span>' : '') + '</button>' +
+    '<button class="ctxchip" data-act="toggleDay" data-date="' + date + '">' + (dt === 'weekend' ? 'Weekend' : 'Weeknight') + (o.dayType ? ' <span class="set">set</span>' : '') + '</button>' +
+    '</div>';
+}
+
+/* ============ views ============ */
+function viewTonight(){
+  const t = today();
+  $('#top').innerHTML = headerHTML(fmtDate(t, {weekday:'long', month:'long', day:'numeric'}), esc(CITIES[state.city].name), ctxChipsHTML(t));
+  if (!state.meals.length) return emptyMeals();
+  const ctx = ctxFor(t);
+  const out = [];
+  if (hasExamples()) out.push('<div class="banner info"><div><b>These are example meals.</b> Edit or keep any you like, then clear the rest when your own are in.</div><div class="btns"><button class="btn sm" data-act="go" data-to="meals">See meals</button><button class="btn sm" data-act="clearExamples" data-confirm="Tap again to clear">Clear examples</button></div></div>');
+  const pend = pendingConfirm();
+  if (pend){
+    out.push('<div class="banner"><div>Did you end up making <b>' + esc(pend.name) + '</b> ' + (diff(t, pend.date) === 1 ? 'last night' : 'on ' + fmtDate(pend.date, {weekday:'long'})) + '?</div><div class="btns">' +
+      '<button class="btn sm primary" data-act="confirmYes" data-id="' + pend.id + '">Yes</button>' +
+      '<button class="btn sm" data-act="confirmOut" data-id="' + pend.id + '">We ate out</button>' +
+      '<button class="btn sm" data-act="confirmOther" data-id="' + pend.id + '">Something else</button></div></div>');
+  }
+  const todays = state.log.find(e => e.date === t);
+  if (todays){
+    out.push('<div class="card hero"><div class="eyebrow">Tonight</div><h3>' + esc(todays.type === 'out' ? 'Eating out' : todays.name) + '</h3>' +
+      '<div class="btns"><button class="btn sm" data-act="undoToday">Change tonight</button></div></div>');
+    return out.join('');
+  }
+  const {ok, blocked} = rank(ctx);
+  let picks = ok.slice();
+  const plannedDay = state.plan && state.plan.days.find(d => d.date === t && d.mealId && mealById(d.mealId));
+  if (plannedDay){
+    const pm = mealById(plannedDay.mealId);
+    const sc = scoreMeal(pm, ctx);
+    picks = picks.filter(x => x.m.id !== pm.id);
+    out.push('<div class="card hero"><div class="eyebrow">Planned for tonight</div><h3>' + esc(pm.name) + '</h3>' + reasonsHTML(sc.reasons) +
+      '<button class="btn primary wide" data-act="make" data-id="' + pm.id + '">Making this</button></div>');
+  }
+  if (picks.length < 3) picks = picks.concat(blocked.slice(0, 3 - picks.length));
+  const top = picks.slice(0, plannedDay ? 2 : 3), more = picks.slice(top.length, top.length + 6);
+  if (top.length){
+    out.push('<section class="section"><h2>' + (plannedDay ? 'Or instead' : 'Best fits tonight') + '</h2>');
+    top.forEach((x, i) => {
+      const lead = i === 0 && !plannedDay;
+      out.push('<div class="card' + (lead ? ' hero' : '') + '">' + (lead ? '<div class="eyebrow">Top pick</div>' : '') + '<h3>' + esc(x.m.name) + '</h3>' +
+        (x.blocked ? '<div class="reasons"><span class="rs bad">' + esc(x.blocked) + '</span></div>' : '') + reasonsHTML(x.reasons) +
+        '<button class="btn ' + (lead ? 'primary ' : '') + 'wide" data-act="make" data-id="' + x.m.id + '">Making this</button></div>');
+    });
+    out.push('</section>');
+  }
+  if (more.length){
+    out.push('<details><summary>More options (' + more.length + ')</summary><div class="list">' + more.map(x =>
+      '<button class="item" data-act="make" data-id="' + x.m.id + '"><div class="grow"><div class="title">' + esc(x.m.name) + '</div><div class="meta">' + esc((x.blocked ? x.blocked + ' · ' : '') + x.reasons.slice(0, 2).map(r => r.t).join(' · ')) + '</div></div><span class="pill due">Make</span></button>').join('') + '</div></details>');
+  }
+  out.push('<div class="btns"><button class="btn" data-act="ateOut" data-date="' + t + '">We ate out</button><button class="btn" data-act="madeOther" data-date="' + t + '">Made something else</button></div>');
+  const hidden = blocked.length - Math.max(0, picks.length - ok.length);
+  if (hidden > 0) out.push('<p class="hint">' + hidden + ' meal' + (hidden > 1 ? 's' : '') + ' resting (made recently, weekend-only, or already had this phase).</p>');
+  return out.join('');
+}
+function emptyMeals(){
+  return '<div class="empty"><b>No meals yet</b><span>Add the dinners you make. Suggestions start as soon as there are a few.</span><button class="btn primary" data-act="editMeal">Add a meal</button></div>';
+}
+
+function planContexts(days){
+  const planned = [];
+  return days.map(d => {
+    const others = days.filter(x => x.mealId && x.date !== d.date).map(x => x.mealId);
+    const share = shareSet(planned.map(p => p.mealId));
+    const ctx = ctxFor(d.date, {planned: planned.slice(), share, exclude: new Set(others)});
+    if (d.mealId) planned.push({date: d.date, mealId: d.mealId});
+    return ctx;
+  });
+}
+function shareSet(ids){
+  const s = new Set();
+  ids.forEach(id => { const m = mealById(id); if (!m) return; m.ings.forEach(i => { const info = ingInfo(i.name); if (info && !info.pantry) s.add(info.key); }); });
+  return s;
+}
+function buildPlan(){
+  const cfg = state.planCfg; const start = add(today(), cfg.offset); const n = cfg.n;
+  const old = state.plan;
+  const days = [];
+  for (let i = 0; i < n; i++){
+    const date = add(start, i);
+    const keep = old && old.days.find(d => d.date === date && d.locked && mealById(d.mealId));
+    days.push(keep ? Object.assign({}, keep) : {date, mealId: null, locked: false, skip: []});
+  }
+  const lockedIds = new Set(days.filter(d => d.locked).map(d => d.mealId));
+  const planned = [];
+  days.forEach(d => {
+    if (!d.locked){
+      const used = new Set([...lockedIds, ...planned.map(p => p.mealId)]);
+      const ctx = ctxFor(d.date, {planned: planned.slice(), share: shareSet(planned.map(p => p.mealId)), exclude: used});
+      const {ok, blocked} = rank(ctx);
+      const pick = ok[0] || blocked[0];
+      d.mealId = pick ? pick.m.id : null;
+    }
+    if (d.mealId) planned.push({date: d.date, mealId: d.mealId});
+  });
+  state.plan = {start, days, checked: (old && old.checked) || {}};
+  save();
+}
+function swapDay(date){
+  const p = state.plan; const idx = p.days.findIndex(d => d.date === date); const d = p.days[idx];
+  d.skip = d.skip || [];
+  if (d.mealId) d.skip.push(d.mealId);
+  const planned = p.days.slice(0, idx).filter(x => x.mealId).map(x => ({date: x.date, mealId: x.mealId}));
+  const others = new Set(p.days.filter(x => x.date !== date && x.mealId).map(x => x.mealId));
+  const tryPick = () => {
+    const ctx = ctxFor(date, {planned, share: shareSet(planned.map(x => x.mealId)), exclude: new Set([...others, ...d.skip])});
+    const {ok, blocked} = rank(ctx); return ok[0] || blocked[0];
+  };
+  let pick = tryPick();
+  if (!pick){ d.skip = d.mealId ? [d.mealId] : []; pick = tryPick(); }
+  d.mealId = pick ? pick.m.id : d.mealId;
+  d.locked = false;
+  save();
+}
+function groceryList(){
+  const p = state.plan; if (!p) return {buy: [], pantry: []};
+  const groups = new Map();
+  p.days.forEach(d => {
+    const m = d.mealId && mealById(d.mealId); if (!m) return;
+    m.ings.forEach(i => {
+      const key = norm(cleanName(i.name)) || norm(i.name);
+      const info = ingInfo(i.name);
+      let g = groups.get(key);
+      if (!g){ g = {key, name: cleanName(i.name) || i.name, sums: {}, texts: [], meals: [], pantry: !!(info && info.pantry)}; groups.set(key, g); }
+      const a = amountParse(i.amt);
+      if (a.n != null) g.sums[a.u] = (g.sums[a.u] || 0) + a.n;
+      else if (i.amt) g.texts.push(i.amt);
+      if (!g.meals.includes(m.name)) g.meals.push(m.name);
+    });
+  });
+  const list = [...groups.values()].map(g => {
+    const parts = Object.entries(g.sums).map(([u, n]) => fmtQty(n, u)).concat(g.texts);
+    return Object.assign(g, {qty: parts.join(' + ')});
+  }).sort((a, b) => a.name.localeCompare(b.name));
+  return {buy: list.filter(g => !g.pantry), pantry: list.filter(g => g.pantry)};
+}
+function viewPlan(){
+  const cfg = state.planCfg;
+  $('#top').innerHTML = headerHTML('Plan ahead', 'Pick the next few dinners and get one grocery list.');
+  const out = [];
+  out.push('<div class="card"><div class="row wrap"><div class="seg" style="flex:1 1 200px"><button data-act="planOffset" data-v="0" aria-pressed="' + (cfg.offset === 0) + '">Start today</button><button data-act="planOffset" data-v="1" aria-pressed="' + (cfg.offset === 1) + '">Start tomorrow</button></div>' +
+    '<div class="row"><button class="btn sm" data-act="planN" data-v="-1" aria-label="Fewer nights">−</button><span class="num" style="min-width:64px;text-align:center"><b>' + cfg.n + '</b> nights</span><button class="btn sm" data-act="planN" data-v="1" aria-label="More nights">+</button></div></div>' +
+    '<button class="btn primary wide" data-act="buildPlan">' + (state.plan ? 'Rebuild plan (keeps locked nights)' : 'Build plan') + '</button></div>');
+  const p = state.plan;
+  if (!p){ out.push('<div class="empty"><b>No plan yet</b><span>Plans use the forecast and your cycle for each night, and favor meals that share fresh ingredients.</span></div>'); return out.join(''); }
+  const ctxs = planContexts(p.days);
+  const t = today();
+  out.push('<section class="section"><div class="row"><h2>Dinners</h2><span class="spacer"></span><button class="btn ghost sm" data-act="clearPlan" data-confirm="Tap again to clear">Clear plan</button></div>');
+  p.days.forEach((d, i) => {
+    const m = d.mealId && mealById(d.mealId);
+    const ctx = ctxs[i];
+    const sc = m ? scoreMeal(m, ctx) : null;
+    const logged = state.log.find(e => e.date === d.date);
+    const ph = ctx.phase.phase;
+    const vib = [...ctx.vibes];
+    const wx = weatherFor(d.date);
+    const meta = [ph ? PH[ph] : null, wx ? wxText(wx) : null, vib.length ? vib.map(v => VIBE[v].label).join(' + ') : null, ctx.dayType === 'weekend' ? 'Weekend' : null].filter(Boolean).join(' · ');
+    out.push('<div class="card plan-day"><div class="plan-date' + (d.date === t ? ' today' : '') + '"><small>' + DOW[dow(d.date)] + '</small><b class="num">' + Number(d.date.slice(8)) + '</b></div><div style="min-width:0;display:flex;flex-direction:column;gap:8px">' +
+      '<div class="small muted">' + esc(meta || 'No context yet') + '</div>' +
+      '<h3>' + (m ? esc(m.name) : '<span class="muted">Nothing fits</span>') + '</h3>' +
+      (logged ? '<div class="reasons"><span class="rs good">Logged: ' + esc(logged.type === 'out' ? 'ate out' : logged.name) + '</span></div>' : (sc ? reasonsHTML(sc.reasons, 3) : '')) +
+      '<div class="btns"><button class="btn sm" data-act="swap" data-date="' + d.date + '">Swap</button><button class="btn sm" data-act="lock" data-date="' + d.date + '" aria-pressed="' + !!d.locked + '">' + (d.locked ? 'Locked' : 'Lock') + '</button>' +
+      '<button class="btn sm" data-act="choose" data-date="' + d.date + '">Choose</button></div></div></div>');
+  });
+  out.push('</section>');
+  const g = groceryList();
+  const ch = p.checked || {};
+  out.push('<section class="section"><div class="row"><h2>Grocery list</h2><span class="spacer"></span><button class="btn ghost sm" data-act="copyList">Copy</button></div>');
+  if (!g.buy.length && !g.pantry.length) out.push('<p class="hint">Add ingredients to these meals to get a list.</p>');
+  if (g.buy.length) out.push('<div class="list">' + g.buy.map(groc(ch)).join('') + '</div>');
+  if (g.pantry.length) out.push('<details><summary>Check the pantry (' + g.pantry.length + ')</summary><div class="list">' + g.pantry.map(groc(ch)).join('') + '</div></details>');
+  out.push('</section>');
+  return out.join('');
+}
+const groc = ch => g => '<label class="groc' + (ch[g.key] ? ' done' : '') + '"><input type="checkbox" data-act="check" data-key="' + esc(g.key) + '"' + (ch[g.key] ? ' checked' : '') + '><div class="grow"><div class="gname">' + esc(g.name) + '</div><div class="gq">' + esc([g.qty, g.meals.length > 1 ? g.meals.length + ' meals' : g.meals[0]].filter(Boolean).join(' · ')) + '</div></div></label>';
+
+function viewMeals(){
+  $('#top').innerHTML = headerHTML('Meals', state.meals.length + ' in rotation');
+  const out = [];
+  out.push('<div class="seg"><button data-act="mealsTab" data-v="list" aria-pressed="' + (ui.mealsTab === 'list') + '">Library</button><button data-act="mealsTab" data-v="history" aria-pressed="' + (ui.mealsTab === 'history') + '">History</button></div>');
+  if (ui.mealsTab === 'list'){
+    out.push('<div class="row"><input type="search" id="mealSearch" placeholder="Search meals or ingredients" value="' + esc(ui.q) + '" autocomplete="off"><button class="btn primary" data-act="editMeal">Add</button></div>');
+    out.push('<div id="mealList">' + mealListHTML() + '</div>');
+  } else {
+    out.push('<button class="btn" data-act="logPast">Log a past dinner</button>');
+    const entries = state.log.slice().sort((a, b) => a.date < b.date ? 1 : -1).slice(0, 80);
+    if (!entries.length) out.push('<div class="empty"><b>No dinners logged</b><span>Tap “Making this” on Tonight, or log past dinners here so the rotation knows what you had.</span></div>');
+    else out.push('<div class="list">' + entries.map(e => '<div class="item"><div class="grow"><div class="title">' + esc(e.type === 'out' ? 'Ate out' : e.name) + (e.example ? ' <span class="pill ex">Example</span>' : '') + (!e.confirmed && e.type === 'meal' ? ' <span class="pill">Unconfirmed</span>' : '') + '</div><div class="meta">' + fmtDate(e.date, {weekday:'short', month:'short', day:'numeric', year: e.date.slice(0, 4) === today().slice(0, 4) ? undefined : 'numeric'}) + '</div></div><button class="btn sm danger" data-act="delLog" data-id="' + e.id + '" data-confirm="Delete?">Remove</button></div>').join('') + '</div>');
+  }
+  return out.join('');
+}
+function mealListHTML(){
+  if (!state.meals.length) return emptyMeals();
+  const q = norm(ui.q);
+  const list = state.meals.filter(m => !q || norm(m.name).includes(q) || m.ings.some(i => norm(i.name).includes(q)))
+    .sort((a, b) => (a.active === false) - (b.active === false) || a.name.localeCompare(b.name));
+  if (!list.length) return '<p class="hint">No meals match “' + esc(ui.q) + '”.</p>';
+  return '<div class="list">' + list.map(m => {
+    const st = mealStatus(m);
+    return '<button class="item" data-act="editMeal" data-id="' + m.id + '"><div class="grow"><div class="title">' + esc(m.name) + (m.example ? ' <span class="pill ex">Example</span>' : '') + (m.needsDetails ? ' <span class="pill ex">Needs details</span>' : '') + (m.active === false ? ' <span class="pill">Paused</span>' : '') + '</div>' +
+      '<div class="meta">' + esc(schedText(m)) + ' · ' + (st.last ? 'last ' + ago(st.last) : 'never logged') + '</div></div>' + st.pill + '</button>';
+  }).join('') + '</div>';
+}
+
+function viewCycle(){
+  const t = today();
+  const st = cycleStats();
+  const ph = estPhase(t);
+  $('#top').innerHTML = headerHTML('Cycle', st.ps.length ? 'Estimated from ' + st.ps.length + ' logged period' + (st.ps.length > 1 ? 's' : '') : 'Log periods to estimate phases');
+  const out = [];
+  if (!st.ps.length){
+    out.push('<div class="card"><h3>When did your last period start?</h3><p class="hint">One date is enough to begin. The estimate improves as you log more cycles.</p><div class="row"><input type="date" id="firstStart" max="' + t + '" value="' + t + '"><button class="btn primary" data-act="addFirst">Save</button></div></div>');
+  } else {
+    const last = st.ps[st.ps.length - 1];
+    const next = add(last.start, st.L);
+    const lateBy = diff(t, next);
+    out.push('<div class="card hero" style="--phc:' + phaseVar(ph.phase) + '"><div class="eyebrow" style="color:var(--phc)">Today' + (ph.day ? ' · day ' + ph.day : '') + '</div>' +
+      '<div class="bigphase">' + (ph.phase ? PH[ph.phase] : 'Unknown') + '</div>' +
+      '<div class="small muted">' + (ph.phase ? (lateBy > 0 ? 'Period expected ' + lateBy + ' day' + (lateBy > 1 ? 's' : '') + ' ago.' : 'Next period around ' + fmtDate(next, {weekday:'short', month:'short', day:'numeric'}) + '.') : 'Last logged period is too old to estimate from. Log the latest one.') + '</div>' +
+      (ph.phase ? timelineHTML(ph) : '') + '</div>');
+    const open = last && !last.end && diff(t, last.start) <= 14;
+    out.push('<div class="btns">' + (open ? '<button class="btn primary" data-act="periodEnd">Period ended today</button>' : '<button class="btn primary" data-act="periodStart">Period started today</button>') + '<button class="btn" data-act="periodOther">Log another date</button></div>');
+    out.push('<p class="hint">Average cycle ' + st.L + ' days' + (st.nCycles ? ' (from ' + st.nCycles + ' cycle' + (st.nCycles > 1 ? 's' : '') + ')' : ' (default until two periods are logged)') + '. Bleeding ' + st.P + ' days' + (st.nLens ? '' : ' (default; log end dates to refine)') + '. Ovulation is estimated 14 days before the next period, so phase edges can be off by a few days.</p>');
+    out.push('<section class="section"><h2>Logged periods</h2><div class="list">' + st.ps.slice().reverse().slice(0, 12).map(p => '<div class="item"><div class="grow"><div class="title">' + fmtDate(p.start, {month:'short', day:'numeric', year:'numeric'}) + '</div><div class="meta">' + (p.end ? (diff(p.end, p.start) + 1) + ' days, ended ' + fmtDate(p.end, {month:'short', day:'numeric'}) : 'No end date') + '</div></div><button class="btn sm danger" data-act="delPeriod" data-start="' + p.start + '" data-confirm="Delete?">Remove</button></div>').join('') + '</div></section>');
+  }
+  out.push('<section class="section"><h2>What each phase favors</h2><p class="hint">Meals with these nutrients rank higher during that phase. Tap to cycle: off, on, strong (×2).</p>');
+  PH_KEYS.forEach(p => {
+    const map = state.settings.phaseMap[p] || {};
+    out.push('<div class="card" style="--phc:' + phaseVar(p) + '"><div class="label" style="color:var(--phc)">' + PH[p] + '</div><div class="chips">' + Object.keys(NUT).map(n => {
+      const w = map[n] || 0;
+      return '<button class="chip" data-act="phaseNut" data-p="' + p + '" data-n="' + n + '" aria-pressed="' + (w > 0) + '">' + NUT[n] + (w > 1 ? ' <span class="w">×2</span>' : '') + '</button>';
+    }).join('') + '</div></div>');
+  });
+  out.push('<p class="hint">Iron during bleeding has the clearest basis: you are replacing what is lost, and vitamin C in the same meal helps absorb iron from plants. Most other phase-food pairings rest on weaker evidence, so treat them as preferences and edit freely.</p><button class="btn ghost sm" data-act="resetPhaseMap" data-confirm="Tap again to reset">Reset to defaults</button></section>');
+  return out.join('');
+}
+function timelineHTML(ph){
+  const L = ph.L, segs = [];
+  let cur = null, count = 0;
+  for (let d = 1; d <= L; d++){
+    const p = phaseOnDay(d, L, ph.menEnd);
+    if (p !== cur){ if (cur) segs.push([cur, count]); cur = p; count = 0; }
+    count++;
+  }
+  segs.push([cur, count]);
+  const pos = Math.min(ph.day, L) - .5;
+  return '<div class="tl-wrap"><div class="timeline" aria-hidden="true">' + segs.map(([p, c]) => '<i style="width:' + (c / L * 100) + '%;background:' + phaseVar(p) + '"></i>').join('') + '</div><div class="tl-mark" style="left:' + (pos / L * 100) + '%"></div></div>' +
+    '<div class="legend">' + segs.map(([p, c]) => '<span style="--phc:' + phaseVar(p) + '">' + PH[p] + ' <span class="num">' + c + 'd</span></span>').join('') + '</div>';
+}
+
+function viewSettings(){
+  $('#top').innerHTML = headerHTML('Settings', 'Everything stays on this phone.');
+  const s = state.settings;
+  const out = [];
+  out.push('<section class="section"><h2>Weather</h2><div class="card"><div class="seg">' + Object.entries(CITIES).map(([k, c]) => '<button data-act="city" data-v="' + k + '" aria-pressed="' + (state.city === k) + '">' + c.name + '</button>').join('') + '</div>' +
+    '<label class="row"><span class="grow" style="flex:1">Cozy at or below this high</span><input type="number" id="coldMax" data-set="coldMax" value="' + s.coldMax + '" inputmode="numeric"> °F</label>' +
+    '<label class="row"><span class="grow" style="flex:1">Fresh at or above this high</span><input type="number" id="hotMin" data-set="hotMin" value="' + s.hotMin + '" inputmode="numeric"> °F</label>' +
+    '<p class="hint">Rain also counts as cozy below 72°F. Grill means 65°F or warmer with little chance of rain. Forecast from Open-Meteo, checked at most once a day.</p>' +
+    '<button class="btn sm" data-act="refreshWx">Refresh forecast</button></div></section>');
+  out.push('<section class="section"><h2>Week</h2><div class="card"><div class="label">Weekend nights</div><div class="chips">' + DOW.map((d, i) => '<button class="chip" data-act="wkday" data-v="' + i + '" aria-pressed="' + s.weekendDays.includes(i) + '">' + d + '</button>').join('') + '</div>' +
+    '<label class="row"><span style="flex:1">Default rotation for new meals</span><input type="number" id="defaultDays" data-set="defaultDays" value="' + s.defaultDays + '" inputmode="numeric"> days</label></div></section>');
+  const lb = state.lastBackup;
+  out.push('<section class="section"><h2>Backup</h2><div class="card"><p class="hint">Your meals live only on this phone. Deleting the home-screen icon or resetting the phone erases them, so save a backup to Files now and then.</p>' +
+    '<div class="small">' + (lb ? 'Last backup ' + ago(lb) + '.' : 'No backup yet.') + '</div>' +
+    '<div class="btns"><button class="btn primary" data-act="export">Save backup</button><button class="btn" data-act="import">Restore from file</button></div><div id="backupOut"></div></div></section>');
+  out.push('<section class="section"><h2>Data</h2><div class="card">' + (hasExamples() ? '<button class="btn" data-act="clearExamples" data-confirm="Tap again to clear">Clear example meals</button>' : '') +
+    '<button class="btn" data-act="loadExamples">Add example meals</button>' +
+    '<button class="btn danger" data-act="eraseAll" data-confirm="Tap again to erase everything">Erase all data</button></div></section>');
+  return out.join('');
+}
+
+/* ============ sheets ============ */
+let sheetSave = null, sheetCancel = null;
+function openSheet(title, bodyHTML, opts){
+  opts = opts || {};
+  sheetSave = opts.onSave || null;
+  sheetCancel = opts.onCancel || null;
+  $('#sheetHead').innerHTML = '<button class="btn ghost" data-act="closeSheet">' + (opts.onSave ? 'Cancel' : 'Close') + '</button><h3 id="sheetTitle">' + esc(title) + '</h3>' + (opts.onSave ? '<button class="btn ghost" data-act="sheetSave"><b>' + esc(opts.saveLabel || 'Save') + '</b></button>' : '<span style="min-width:72px"></span>');
+  $('#sheetBody').innerHTML = bodyHTML;
+  $('#sheetBody').scrollTop = 0;
+  $('#sheet').hidden = false;
+  document.documentElement.style.overflow = 'hidden';
+}
+function closeSheet(){ $('#sheet').hidden = true; document.documentElement.style.overflow = ''; draft = null; sheetSave = null; sheetCancel = null; render(); }
+function cancelSheet(){ if (sheetCancel){ const f = sheetCancel; sheetCancel = null; f(); } else closeSheet(); }
+
+function chooser(title, options, onPick){
+  openSheet(title, '<div class="list">' + options.map((o, i) => '<button class="item" data-act="choose-opt" data-i="' + i + '"><div class="grow opt"><span class="title">' + esc(o.label) + '</span>' + (o.sub ? '<small>' + esc(o.sub) + '</small>' : '') + '</div>' + (o.on ? '<span class="pill due">Current</span>' : '') + '</button>').join('') + '</div>');
+  chooser.pick = i => { onPick(options[i]); };
+}
+
+function mealPicker(title, onPick, allowNew){
+  ui.pickQ = '';
+  openSheet(title, '<input type="search" id="pickSearch" placeholder="Search or type a new meal" autocomplete="off"><div id="pickList">' + pickListHTML(allowNew) + '</div>');
+  mealPicker.pick = onPick; mealPicker.allowNew = allowNew;
+}
+function pickListHTML(allowNew){
+  const q = norm(ui.pickQ);
+  const list = state.meals.filter(m => !q || norm(m.name).includes(q)).sort((a, b) => a.name.localeCompare(b.name)).slice(0, 40);
+  let h = '';
+  if (allowNew && ui.pickQ.trim() && !state.meals.some(m => norm(m.name) === q)) h += '<button class="btn primary wide" data-act="pickNew" style="margin-bottom:12px">Add “' + esc(ui.pickQ.trim()) + '” as a new meal</button>';
+  h += list.length ? '<div class="list">' + list.map(m => '<button class="item" data-act="pickMeal" data-id="' + m.id + '"><div class="grow"><div class="title">' + esc(m.name) + '</div></div></button>').join('') + '</div>' : '<p class="hint">No meals match.</p>';
+  return h;
+}
+
+function openEditor(id){
+  const m = id ? mealById(id) : newMeal('');
+  draft = JSON.parse(JSON.stringify(m));
+  draft.ingsText = ingsToText(m.ings);
+  draft._new = !id;
+  openSheet(id ? 'Edit meal' : 'New meal', editorHTML(), {onSave: saveDraft});
+}
+function renderEditor(){ $('#sheetBody').innerHTML = editorHTML(); }
+function editorHTML(){
+  const d = draft;
+  const sched = d.sched || {type:'days', days: state.settings.defaultDays};
+  const presets = [7, 14, 21, 30, 60, 90];
+  const months = d.months && d.months.length && d.months.length < 12 ? d.months : null;
+  return '<label class="field"><span>Name</span><input type="text" id="ed-name" data-f="name" value="' + esc(d.name) + '" placeholder="Red lentil soup" autocomplete="off"></label>' +
+    '<div class="field"><span>Ingredients</span><p class="hint">One per line, amount first. Example: 2 lb chicken thighs</p><textarea id="ed-ings" data-f="ingsText" rows="7" placeholder="1½ cups red lentils&#10;1 bunch kale&#10;2 lemons">' + esc(d.ingsText) + '</textarea><div class="ing" id="ingPreview">' + ingPreviewHTML() + '</div></div>' +
+    '<div class="field"><span>Nutrients</span><p class="hint">Filled in from the ingredients. Tap one to switch it off, or tap a blank one to add it.</p><div class="chips" id="nutChips">' + nutChipsHTML() + '</div></div>' +
+    '<div class="field"><span>How often</span><div class="seg"><button data-act="ed-schedType" data-v="days" aria-pressed="' + (sched.type !== 'phase') + '">Every few days</button><button data-act="ed-schedType" data-v="phase" aria-pressed="' + (sched.type === 'phase') + '">Once per phase</button></div>' +
+    (sched.type === 'phase'
+      ? '<div class="chips">' + PH_KEYS.map(p => '<button class="chip" data-act="ed-schedPhase" data-v="' + p + '" aria-pressed="' + (sched.phase === p) + '">' + PH[p] + '</button>').join('') + '</div><p class="hint">Suggested once each time this phase comes around, and held back the rest of the cycle.</p>'
+      : '<div class="chips">' + presets.map(n => '<button class="chip" data-act="ed-days" data-v="' + n + '" aria-pressed="' + (sched.days === n) + '">' + (n % 7 === 0 && n <= 28 ? (n / 7) + ' wk' : n === 30 ? '1 mo' : n === 60 ? '2 mo' : n === 90 ? '3 mo' : n + ' d') + '</button>').join('') + '</div><label class="row"><span style="flex:1">Or every</span><input type="number" id="ed-daysN" data-f="days" value="' + (sched.days || '') + '" inputmode="numeric" min="1"> days</label>') + '</div>' +
+    '<div class="field"><span>Which nights</span><div class="seg">' + [['any','Any'],['weeknight','Weeknight'],['weekend','Weekend only']].map(([v, l]) => '<button data-act="ed-when" data-v="' + v + '" aria-pressed="' + (d.when === v) + '">' + l + '</button>').join('') + '</div></div>' +
+    '<div class="field"><span>Weather it suits</span><div class="chips">' + Object.entries(VIBE).map(([k, v]) => '<button class="chip" data-act="ed-vibe" data-v="' + k + '" aria-pressed="' + d.vibes.includes(k) + '">' + v.label + ' <small class="muted">' + v.hint + '</small></button>').join('') + '</div><p class="hint">Leave blank if it works in any weather.</p></div>' +
+    '<div class="field"><span>Extra boost during</span><div class="chips">' + PH_KEYS.map(p => '<button class="chip" data-act="ed-phase" data-v="' + p + '" aria-pressed="' + d.phases.includes(p) + '">' + PH[p] + '</button>').join('') + '</div><p class="hint">For meals you crave or like in a phase, on top of the nutrient match.</p></div>' +
+    '<div class="field"><span>Season</span><div class="chips"><button class="chip" data-act="ed-yearround" aria-pressed="' + !months + '">Year-round</button>' + MONTHS.map((n, i) => '<button class="chip" data-act="ed-month" data-v="' + (i + 1) + '" aria-pressed="' + !!(months && months.includes(i + 1)) + '">' + n + '</button>').join('') + '</div></div>' +
+    '<label class="field"><span>Last made (optional)</span><input type="date" id="ed-seed" data-f="seedLast" value="' + esc(d.seedLast || '') + '" max="' + today() + '"><span class="hint" style="font-weight:400">Helps the rotation on day one if you have not logged it yet.</span></label>' +
+    '<label class="field"><span>Notes</span><textarea id="ed-notes" data-f="notes" rows="2" placeholder="Recipe link, tweaks, who likes it">' + esc(d.notes || '') + '</textarea></label>' +
+    '<label class="row"><input type="checkbox" id="ed-active" data-f="active"' + (d.active !== false ? ' checked' : '') + ' style="width:22px;height:22px;accent-color:var(--accent)"><span>Include in suggestions</span></label>' +
+    (d._new ? '' : '<button class="btn danger" data-act="ed-delete" data-confirm="Tap again to delete this meal">Delete meal</button>');
+}
+function ingPreviewHTML(){
+  const ings = parseIngs(draft.ingsText);
+  if (!ings.length) return '';
+  return ings.map((i, idx) => {
+    const info = ingInfo(i.name);
+    let tags = '';
+    if (info && info.pantry) tags = '<span class="tag">pantry</span>';
+    else if (info && info.flags.length) tags = info.flags.map(f => '<span class="tag n">' + NUT[f] + '</span>').join('');
+    else if (info && !info.known) tags = '<button class="tag ask" data-act="tagIng" data-name="' + esc(i.name) + '">Not in list · tag it</button>';
+    if (info && info.custom) tags += ' <button class="tag" data-act="tagIng" data-name="' + esc(i.name) + '">edit</button>';
+    return '<div class="ingrow"><span class="amt num">' + esc(i.amt || '–') + '</span><span class="nm">' + esc(i.name) + '</span>' + tags + '</div>';
+  }).join('');
+}
+function nutChipsHTML(){
+  const {auto, fin} = mealNutrients(draft, parseIngs(draft.ingsText));
+  return Object.keys(NUT).map(n => {
+    const isAuto = !!auto[n], on = !!fin[n], forcedOff = draft.nOver[n] === false;
+    return '<button class="chip' + (isAuto && on && draft.nOver[n] === undefined ? ' auto' : '') + (forcedOff ? ' off' : '') + '" data-act="ed-nut" data-v="' + n + '" aria-pressed="' + on + '">' + NUT[n] + '</button>';
+  }).join('');
+}
+function saveDraft(){
+  const d = draft;
+  const name = (d.name || '').trim();
+  if (!name){ toast('Give the meal a name first.'); $('#ed-name').focus(); return; }
+  const ings = parseIngs(d.ingsText);
+  const sched = d.sched.type === 'phase' ? {type:'phase', phase: d.sched.phase || 'luteal'} : {type:'days', days: Math.max(1, Math.round(Number(d.sched.days) || state.settings.defaultDays))};
+  const months = d.months && d.months.length && d.months.length < 12 ? d.months.slice().sort((a, b) => a - b) : null;
+  const m = {id: d.id, name, ings, sched, when: d.when || 'any', vibes: d.vibes, phases: d.phases, months, nOver: d.nOver, notes: d.notes || '', active: d.active !== false, seedLast: d.seedLast || null};
+  const i = state.meals.findIndex(x => x.id === d.id);
+  if (i >= 0) state.meals[i] = m;
+  else state.meals.push(m);
+  state.log.forEach(e => { if (e.mealId === m.id) e.name = m.name; });
+  save();
+  closeSheet();
+  toast('Saved ' + name);
+}
+function tagIngredient(name){
+  const n = norm(cleanName(name));
+  const cur = state.customIng[n] || {flags: [], pantry: false};
+  const tmp = {flags: cur.flags.slice(), pantry: cur.pantry};
+  const back = draft ? JSON.parse(JSON.stringify(draft)) : null;
+  const body = () => '<p class="hint">Which of these does <b>' + esc(cleanName(name)) + '</b> bring to a meal? This applies to every meal that uses it.</p><div class="chips">' +
+    Object.keys(NUT).map(k => '<button class="chip" data-act="ti-n" data-v="' + k + '" aria-pressed="' + tmp.flags.includes(k) + '">' + NUT[k] + '</button>').join('') + '</div>' +
+    '<label class="row"><input type="checkbox" id="ti-pantry"' + (tmp.pantry ? ' checked' : '') + ' style="width:22px;height:22px;accent-color:var(--accent)"><span>Pantry staple (left off the shopping list)</span></label>';
+  tagIngredient.tmp = tmp;
+  tagIngredient.redraw = () => { $('#sheetBody').innerHTML = body(); };
+  const toEditor = () => { draft = back; openSheet(back._new ? 'New meal' : 'Edit meal', editorHTML(), {onSave: saveDraft}); };
+  openSheet('Tag ingredient', body(), {
+    onSave: () => {
+      tmp.pantry = $('#ti-pantry').checked;
+      state.customIng[n] = {flags: tmp.flags, pantry: tmp.pantry};
+      save();
+      if (back) toEditor(); else closeSheet();
+    },
+    onCancel: back ? toEditor : null
+  });
+}
+
+/* ============ actions ============ */
+let toastTimer = null;
+function toast(msg, undo){
+  const el = $('#toast');
+  el.innerHTML = '<span>' + esc(msg) + '</span>' + (undo ? '<button data-act="toastUndo">Undo</button>' : '');
+  toast.undo = undo || null;
+  el.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { el.hidden = true; toast.undo = null; }, undo ? 6000 : 2600);
+}
+function setOverride(date, key, val){
+  const o = state.overrides[date] || {};
+  if (val == null) delete o[key]; else o[key] = val;
+  if (Object.keys(o).length) state.overrides[date] = o; else delete state.overrides[date];
+  save();
+}
+function armed(el){
+  if (!el.dataset.confirm) return true;
+  if (el.dataset.armed === '1') return true;
+  el.dataset.armed = '1';
+  el.dataset.label = el.innerHTML;
+  el.classList.add('armed');
+  el.textContent = el.dataset.confirm;
+  setTimeout(() => { if (el.isConnected && el.dataset.armed === '1'){ el.dataset.armed = ''; el.classList.remove('armed'); el.innerHTML = el.dataset.label; } }, 3500);
+  return false;
+}
+async function copyText(text, fallbackTarget){
+  try { await navigator.clipboard.writeText(text); toast('Copied'); }
+  catch (e) {
+    openSheet('Copy this', '<p class="hint">Press and hold to select, then copy.</p><pre class="copy">' + esc(text) + '</pre>');
+  }
+}
+async function exportData(){
+  const json = JSON.stringify(state);
+  const name = 'supper-cycle-backup-' + today() + '.json';
+  const done = () => { state.lastBackup = today(); save(); render(); toast('Backup saved'); };
+  try {
+    const file = new File([json], name, {type: 'application/json'});
+    if (navigator.canShare && navigator.canShare({files: [file]})){ await navigator.share({files: [file], title: 'Supper Cycle backup'}); done(); return; }
+  } catch (e) { if (e && e.name === 'AbortError') return; }
+  try {
+    const url = URL.createObjectURL(new Blob([json], {type: 'application/json'}));
+    const a = document.createElement('a'); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+    done();
+  } catch (e) { copyText(json); }
+}
+function importFile(file){
+  const r = new FileReader();
+  r.onload = () => {
+    try {
+      const obj = JSON.parse(r.result);
+      if (!obj || !Array.isArray(obj.meals)) throw new Error('bad');
+      openSheet('Restore backup', '<p>This backup has <b>' + obj.meals.length + ' meals</b> and <b>' + (obj.log || []).length + ' logged dinners</b>. Restoring replaces everything on this phone.</p><button class="btn danger wide" data-act="doImport">Replace my data</button>');
+      importFile.pending = obj;
+    } catch (e) { toast('That file is not a Supper Cycle backup.'); }
+  };
+  r.readAsText(file);
+}
+
+const ACT = {
+  go: el => { location.hash = el.dataset.to; },
+  closeSheet: () => cancelSheet(),
+  sheetSave: () => { if (sheetSave) sheetSave(); },
+  toastUndo: () => { const u = toast.undo; $('#toast').hidden = true; if (u) u(); },
+  'choose-opt': el => { const f = chooser.pick; closeSheet(); f(+el.dataset.i); },
+  pickPhase: el => {
+    const date = el.dataset.date; const est = estPhase(date); const cur = (state.overrides[date] || {}).phase;
+    chooser('Phase for ' + fmtDate(date), [{v: null, label: 'Use estimate', sub: est.phase ? PH[est.phase] + (est.day ? ', day ' + est.day : '') : 'No periods logged yet', on: !cur}].concat(PH_KEYS.map(p => ({v: p, label: PH[p], on: cur === p}))),
+      o => { setOverride(date, 'phase', o.v); render(); });
+  },
+  pickVibe: el => {
+    const date = el.dataset.date; const wx = weatherFor(date); const cur = (state.overrides[date] || {}).vibe; const auto = [...autoVibes(wx)];
+    chooser('Weather vibe', [{v: null, label: 'Use forecast', sub: wx ? wxText(wx) + ' → ' + (auto.length ? auto.map(v => VIBE[v].label).join(' + ') : 'Mild') : 'No forecast right now', on: !cur}]
+      .concat(Object.entries(VIBE).map(([k, v]) => ({v: k, label: v.label, sub: v.hint, on: cur === k}))).concat([{v: 'mild', label: 'Mild', sub: 'no weather preference', on: cur === 'mild'}]),
+      o => { setOverride(date, 'vibe', o.v); render(); });
+  },
+  toggleDay: el => {
+    const date = el.dataset.date; const auto = state.settings.weekendDays.includes(dow(date)) ? 'weekend' : 'weekday';
+    const next = dayType(date) === 'weekend' ? 'weekday' : 'weekend';
+    setOverride(date, 'dayType', next === auto ? null : next); render();
+  },
+  make: el => { logMeal(el.dataset.id, today(), false); render(); },
+  ateOut: el => { logOut(el.dataset.date); render(); },
+  madeOther: el => {
+    const date = el.dataset.date;
+    mealPicker('What did you make?', id => { logMeal(id, date, true); }, true);
+  },
+  undoToday: () => { const t = today(); const prev = JSON.stringify(state.log); state.log = state.log.filter(e => e.date !== t); save(); render(); toast('Cleared tonight', () => { state.log = JSON.parse(prev); save(); render(); }); },
+  confirmYes: el => { const e = state.log.find(x => x.id === el.dataset.id); if (e){ e.confirmed = true; save(); } render(); },
+  confirmOut: el => { const e = state.log.find(x => x.id === el.dataset.id); if (e){ logOut(e.date); } render(); },
+  confirmOther: el => { const e = state.log.find(x => x.id === el.dataset.id); if (!e) return; const date = e.date; mealPicker('What did you make?', id => { logMeal(id, date, true); }, true); },
+  pickMeal: el => { const f = mealPicker.pick; closeSheet(); f(el.dataset.id); render(); },
+  pickNew: () => {
+    const m = newMeal(ui.pickQ.trim()); m.needsDetails = true; state.meals.push(m); save();
+    const f = mealPicker.pick; closeSheet(); f(m.id); render();
+  },
+  clearExamples: el => { if (!armed(el)) return; state.meals = state.meals.filter(m => !m.example); state.log = state.log.filter(e => !e.example); if (state.plan) state.plan.days.forEach(d => { if (d.mealId && !mealById(d.mealId)) d.mealId = null; }); save(); render(); toast('Examples cleared'); },
+  loadExamples: () => { const ex = defaultState(true); const names = new Set(state.meals.map(m => norm(m.name))); ex.meals.forEach(m => { if (!names.has(norm(m.name))){ state.meals.push(m); state.log.push(...ex.log.filter(e => e.mealId === m.id)); } }); save(); render(); toast('Examples added'); },
+  planOffset: el => { state.planCfg.offset = +el.dataset.v; save(); render(); },
+  planN: el => { state.planCfg.n = Math.min(7, Math.max(2, state.planCfg.n + (+el.dataset.v))); save(); render(); },
+  buildPlan: () => { buildPlan(); render(); },
+  clearPlan: el => { if (!armed(el)) return; state.plan = null; save(); render(); },
+  swap: el => { swapDay(el.dataset.date); render(); },
+  lock: el => { const d = state.plan.days.find(x => x.date === el.dataset.date); d.locked = !d.locked; save(); render(); },
+  choose: el => { const date = el.dataset.date; mealPicker('Dinner for ' + fmtDate(date), id => { const d = state.plan.days.find(x => x.date === date); d.mealId = id; d.locked = true; save(); }, true); },
+  check: el => { const p = state.plan; p.checked = p.checked || {}; if (el.checked) p.checked[el.dataset.key] = true; else delete p.checked[el.dataset.key]; save(); el.closest('.groc').classList.toggle('done', el.checked); },
+  copyList: () => {
+    const g = groceryList(); const p = state.plan;
+    const lines = ['Groceries, ' + fmtDate(p.days[0].date) + ' to ' + fmtDate(p.days[p.days.length - 1].date)];
+    g.buy.filter(x => !(p.checked || {})[x.key]).forEach(x => lines.push('- ' + x.name + (x.qty ? ' (' + x.qty + ')' : '')));
+    copyText(lines.join('\n'));
+  },
+  mealsTab: el => { ui.mealsTab = el.dataset.v; render(); },
+  editMeal: el => openEditor(el.dataset.id || null),
+  logPast: () => {
+    openSheet('Log a past dinner', '<label class="field"><span>Date</span><input type="date" id="pastDate" max="' + today() + '" value="' + add(today(), -1) + '"></label><button class="btn primary wide" data-act="pastPick">Choose the meal</button><button class="btn wide" data-act="pastOut">We ate out that night</button>');
+  },
+  pastPick: () => { const date = $('#pastDate').value; if (!date) return; mealPicker('Dinner on ' + fmtDate(date), id => logMeal(id, date, true), true); },
+  pastOut: () => { const date = $('#pastDate').value; if (!date) return; closeSheet(); logOut(date); render(); },
+  delLog: el => { if (!armed(el)) return; state.log = state.log.filter(e => e.id !== el.dataset.id); save(); render(); },
+  addFirst: () => { const v = $('#firstStart').value; if (!v) return; state.periods.push({start: v}); save(); render(); },
+  periodStart: () => {
+    const t = today(); const st = cycleStats(); const last = st.ps[st.ps.length - 1];
+    if (last && diff(t, last.start) < 10){ toast('A period starting ' + fmtDate(last.start) + ' is already logged.'); return; }
+    state.periods.push({start: t}); save(); render(); toast('Logged period start');
+  },
+  periodEnd: () => { const t = today(); const st = cycleStats(); const last = st.ps[st.ps.length - 1]; const p = state.periods.find(x => x.start === last.start); p.end = t; save(); render(); toast('Logged period end'); },
+  periodOther: () => {
+    openSheet('Log a period date', '<label class="field"><span>Date</span><input type="date" id="perDate" max="' + today() + '" value="' + today() + '"></label><div class="btns"><button class="btn primary" data-act="perStart">Started this day</button><button class="btn" data-act="perEnd">Ended this day</button></div>');
+  },
+  perStart: () => {
+    const v = $('#perDate').value; if (!v) return;
+    if (state.periods.some(p => Math.abs(diff(p.start, v)) < 10)){ toast('Another period start is within 10 days of that date.'); return; }
+    state.periods.push({start: v}); save(); closeSheet(); toast('Logged period start');
+  },
+  perEnd: () => {
+    const v = $('#perDate').value; if (!v) return;
+    const cand = state.periods.filter(p => p.start <= v && diff(v, p.start) <= 14).sort((a, b) => a.start < b.start ? 1 : -1)[0];
+    if (!cand){ toast('Log the start of that period first.'); return; }
+    cand.end = v; save(); closeSheet(); toast('Logged period end');
+  },
+  delPeriod: el => { if (!armed(el)) return; state.periods = state.periods.filter(p => p.start !== el.dataset.start); save(); render(); },
+  phaseNut: el => { const m = state.settings.phaseMap[el.dataset.p] = state.settings.phaseMap[el.dataset.p] || {}; const n = el.dataset.n; const w = m[n] || 0; if (w >= 2) delete m[n]; else m[n] = w + 1; save(); render(); },
+  resetPhaseMap: el => { if (!armed(el)) return; state.settings.phaseMap = JSON.parse(JSON.stringify(DEFAULT_PHASE_MAP)); save(); render(); },
+  city: el => { state.city = el.dataset.v; save(); render(); ensureWeather(true); },
+  refreshWx: () => ensureWeather(true),
+  wkday: el => { const v = +el.dataset.v; const w = state.settings.weekendDays; const i = w.indexOf(v); if (i >= 0) w.splice(i, 1); else w.push(v); save(); render(); },
+  export: () => exportData(),
+  import: () => $('#importFile').click(),
+  doImport: () => { state = migrate(importFile.pending); save(); closeSheet(); toast('Backup restored'); },
+  eraseAll: el => { if (!armed(el)) return; state = defaultState(false); save(); render(); toast('Everything erased'); },
+  tagIng: el => tagIngredient(el.dataset.name),
+  'ti-n': el => { const t = tagIngredient.tmp; const v = el.dataset.v; const i = t.flags.indexOf(v); if (i >= 0) t.flags.splice(i, 1); else t.flags.push(v); t.pantry = $('#ti-pantry').checked; tagIngredient.redraw(); },
+  'ed-schedType': el => { draft.sched = el.dataset.v === 'phase' ? {type:'phase', phase: (draft.sched && draft.sched.phase) || 'luteal'} : {type:'days', days: (draft.sched && draft.sched.days) || state.settings.defaultDays}; renderEditor(); },
+  'ed-schedPhase': el => { draft.sched = {type:'phase', phase: el.dataset.v}; renderEditor(); },
+  'ed-days': el => { draft.sched = {type:'days', days: +el.dataset.v}; renderEditor(); },
+  'ed-when': el => { draft.when = el.dataset.v; renderEditor(); },
+  'ed-vibe': el => { const v = el.dataset.v; draft.vibes = draft.vibes.includes(v) ? draft.vibes.filter(x => x !== v) : draft.vibes.concat(v); renderEditor(); },
+  'ed-phase': el => { const v = el.dataset.v; draft.phases = draft.phases.includes(v) ? draft.phases.filter(x => x !== v) : draft.phases.concat(v); renderEditor(); },
+  'ed-yearround': () => { draft.months = null; renderEditor(); },
+  'ed-month': el => { const v = +el.dataset.v; let ms = draft.months && draft.months.length < 12 ? draft.months.slice() : []; ms = ms.includes(v) ? ms.filter(x => x !== v) : ms.concat(v); draft.months = ms.length && ms.length < 12 ? ms : null; renderEditor(); },
+  'ed-nut': el => {
+    const n = el.dataset.v; const {auto} = mealNutrients(draft, parseIngs(draft.ingsText)); const o = draft.nOver;
+    if (auto[n]){ if (o[n] === false) delete o[n]; else o[n] = false; }
+    else { if (o[n] === true) delete o[n]; else o[n] = true; }
+    $('#nutChips').innerHTML = nutChipsHTML();
+  },
+  'ed-delete': el => { if (!armed(el)) return; const id = draft.id; state.meals = state.meals.filter(m => m.id !== id); if (state.plan) state.plan.days.forEach(d => { if (d.mealId === id) d.mealId = null; }); save(); closeSheet(); toast('Meal deleted'); }
+};
+
+document.addEventListener('click', e => {
+  const el = e.target.closest('[data-act]');
+  if (!el) { if (e.target === $('#sheet')) cancelSheet(); return; }
+  const f = ACT[el.dataset.act];
+  if (!f) return;
+  if (el.tagName !== 'INPUT') e.preventDefault();
+  f(el, e);
+});
+document.addEventListener('input', e => {
+  const t = e.target;
+  if (t.id === 'mealSearch'){ ui.q = t.value; $('#mealList').innerHTML = mealListHTML(); return; }
+  if (t.id === 'pickSearch'){ ui.pickQ = t.value; $('#pickList').innerHTML = pickListHTML(mealPicker.allowNew); return; }
+  if (draft && t.dataset.f){
+    const f = t.dataset.f;
+    if (f === 'active') draft.active = t.checked;
+    else if (f === 'days') draft.sched = {type:'days', days: Number(t.value) || ''};
+    else draft[f] = t.value;
+    if (f === 'ingsText'){ $('#ingPreview').innerHTML = ingPreviewHTML(); $('#nutChips').innerHTML = nutChipsHTML(); }
+    if (f === 'days') document.querySelectorAll('[data-act="ed-days"]').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.v === draft.sched.days)));
+  }
+});
+document.addEventListener('change', e => {
+  const t = e.target;
+  if (t.dataset.set){
+    const v = Math.round(Number(t.value));
+    if (!Number.isFinite(v)) return;
+    const lim = {coldMax:[0, 90], hotMin:[50, 120], defaultDays:[1, 365]}[t.dataset.set];
+    state.settings[t.dataset.set] = Math.min(lim[1], Math.max(lim[0], v));
+    save(); toast('Saved');
+  }
+  if (t.id === 'importFile' && t.files[0]){ importFile(t.files[0]); t.value = ''; }
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#sheet').hidden) cancelSheet(); });
+
+/* ============ router ============ */
+const VIEWS = {tonight: viewTonight, plan: viewPlan, meals: viewMeals, cycle: viewCycle, settings: viewSettings};
+function currentTab(){ const h = (location.hash || '').slice(1); return VIEWS[h] ? h : 'tonight'; }
+function render(){
+  const tab = currentTab();
+  const y = window.scrollY;
+  $('#view').innerHTML = VIEWS[tab]();
+  document.querySelectorAll('#tabs a').forEach(a => a.setAttribute('aria-current', a.dataset.tab === tab ? 'page' : 'false'));
+  if (render.lastTab === tab) window.scrollTo(0, y); else window.scrollTo(0, 0);
+  render.lastTab = tab;
+}
+window.addEventListener('hashchange', render);
+let lastDay = null;
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible'){ if (lastDay !== today()){ lastDay = today(); render(); } ensureWeather(false); } });
+
+load();
+lastDay = today();
+render();
+ensureWeather(false);
+try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) {}
+if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
+</script>
+</body>
+</html>
